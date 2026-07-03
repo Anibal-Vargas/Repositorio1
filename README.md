@@ -131,3 +131,41 @@ py converter_png_jpeg.py --somente-grandes
 O resultado vai para `C:\Temp\RNCs\Compactados_v2` por padrão (não
 sobrescreve a saída da 1ª passada) e o log fica em
 `log_conversao_png_jpeg.txt`.
+
+## Anonimização de relatórios: `anonimizar_relatorios.py`
+
+Para preparar relatórios para um processo de padronização, `anonimizar_relatorios.py`
+substitui dados sensíveis por marcadores (`[CLIENTE]`, `[CNPJ]`, `[ENDERECO]`,
+`[PESSOA]`, `[EMAIL]`, `[TELEFONE]`) e remove todas as imagens:
+
+- **.docx** — texto anonimizado (corpo, tabelas, cabeçalhos, rodapés, notas e
+  comentários) e imagens removidas de `word/media`; salvo com o mesmo nome +
+  `_anon.docx`.
+- **.pdf** — apenas o texto é extraído, anonimizado e salvo como `_anon.txt`
+  (fotos/páginas digitalizadas sem camada de texto não são reaproveitadas).
+
+O **original nunca é alterado**. Um arquivo corrompido ou protegido por senha
+é **pulado** (nada é copiado para a pasta de saída nesse caso, para não
+vazar dados não anonimizados) e a falha é registrada em `log_anonimizacao.txt`,
+junto com a contagem de substituições por categoria e por arquivo — use o log
+para revisar por amostragem, já que a detecção de nome de pessoa/empresa é
+heurística (rótulos comuns como "Cliente:", "Responsável Técnico:" e sufixos
+de razão social como "Ltda.", "S.A.", "EIRELI"), enquanto CNPJ, e-mail,
+telefone e endereço usam padrões mais específicos.
+
+### Uso (Windows)
+
+Com as pastas padrão (`C:\Temp\RNCs\Compactados` → `C:\Temp\RNCs\Anonimizados`):
+
+```bat
+py anonimizar_relatorios.py
+```
+
+Ou informando as pastas:
+
+```bat
+py anonimizar_relatorios.py --entrada "C:\Temp\RNCs\Compactados" --saida "C:\Temp\RNCs\Anonimizados"
+```
+
+Requer, além de Pillow e python-docx, as bibliotecas `pypdf` e `pdfplumber`
+(inclusas em `requirements.txt`).
