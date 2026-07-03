@@ -57,9 +57,12 @@ Requisitos: Python 3.8+, python-docx, pypdf, pdfplumber
 """
 
 import argparse
+import gc
 import os
+import posixpath
 import re
 import sys
+import time
 import traceback
 import zipfile
 from collections import Counter
@@ -88,7 +91,6 @@ except ImportError:
 PASTA_ENTRADA_PADRAO = r"C:\Temp\RNCs\Compactados"
 PASTA_SAIDA_PADRAO = r"C:\Temp\RNCs\Anonimizados"
 
-TIPO_REL_IMAGEM = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 NS_REL = "http://schemas.openxmlformats.org/package/2006/relationships"
 NS_ALTERNATE_CONTENT = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 TAG_ALTERNATE_CONTENT = f"{{{NS_ALTERNATE_CONTENT}}}AlternateContent"
@@ -277,9 +279,30 @@ def remover_imagens_em_memoria(document):
     return removidas
 
 
+def _resolver_alvo_rels(caminho_rels, alvo):
+    """Resolve um Target de .rels (relativo à pasta da parte-dona) para um
+    caminho absoluto dentro do ZIP, sempre com '/' (independente do SO)."""
+    if alvo.startswith("/"):
+        return alvo.lstrip("/")
+    diretorio_parte = posixpath.dirname(posixpath.dirname(caminho_rels))
+    return posixpath.normpath(posixpath.join(diretorio_parte, alvo))
+
+
 def _remover_media_do_zip(caminho_entrada, caminho_saida):
     """Reabre um .docx já salvo, removendo as partes word/media/* (bytes das
-    imagens) e as relações do tipo imagem nos arquivos .rels correspondentes.
+    imagens) e QUALQUER relação de qualquer arquivo .rels que aponte para uma
+    dessas partes — independente do Type declarado.
+
+    Importante: não basta filtrar pelo Type "image" da relação. O Word usa
+    tipos de relação diferentes para variantes de imagem (ex.: a miniatura
+    "HD Photo" .wdp usada como fallback de imagens com efeitos usa o tipo
+    "http://schemas.microsoft.com/office/2007/relationships/hdphoto", não o
+    tipo "image" padrão). Se essa relação não for removida, a mídia some do
+    ZIP mas a referência continua existindo, e o .docx gerado fica corrompido
+    (python-docx falha ao reabrir com KeyError "no item named ... in the
+    archive"). Por isso aqui resolvemos o Target de cada relação para o
+    caminho real dentro do ZIP e removemos a relação sempre que esse caminho
+    for um dos removidos, não importa o Type.
     """
     import lxml.etree as ET
 
@@ -287,17 +310,26 @@ def _remover_media_do_zip(caminho_entrada, caminho_saida):
         itens = zin.infolist()
         dados = {item.filename: zin.read(item.filename) for item in itens}
 
+    nomes_media_removidos = {
+        nome for nome in dados
+        if nome.replace("\\", "/").lower().startswith("word/media/")
+    }
+
     with zipfile.ZipFile(caminho_saida, "w", zipfile.ZIP_DEFLATED) as zout:
         for item in itens:
             nome = item.filename
-            if nome.replace("\\", "/").lower().startswith("word/media/"):
+            if nome in nomes_media_removidos:
                 continue  # descarta os bytes da imagem
             conteudo = dados[nome]
             if nome.endswith(".rels"):
                 root = ET.fromstring(conteudo)
                 alterado = False
                 for rel in list(root.findall(f"{{{NS_REL}}}Relationship")):
-                    if rel.get("Type") == TIPO_REL_IMAGEM:
+                    alvo = rel.get("Target")
+                    if not alvo or rel.get("TargetMode") == "External":
+                        continue
+                    resolvido = _resolver_alvo_rels(nome, alvo)
+                    if resolvido in nomes_media_removidos:
                         root.remove(rel)
                         alterado = True
                 if alterado:
@@ -310,6 +342,39 @@ def _remover_media_do_zip(caminho_entrada, caminho_saida):
             zout.writestr(novo_info, conteudo)
 
 
+def _remover_arquivo_tolerante(caminho, tentativas=6, espera=0.5):
+    """Remove um arquivo temporário tolerando o WinError 32 ("em uso por
+    outro processo"), comum no Windows quando o antivírus ainda está
+    varrendo o arquivo recém-criado ou um handle demora a ser liberado.
+    Tenta algumas vezes com pequena espera; se não conseguir, desiste em
+    silêncio (um .tmp órfão não afeta o resultado nem é reprocessado)."""
+    for tentativa in range(tentativas):
+        if not os.path.exists(caminho):
+            return
+        try:
+            os.remove(caminho)
+            return
+        except PermissionError:
+            if tentativa == tentativas - 1:
+                return
+            time.sleep(espera)
+
+
+def _substituir_arquivo_tolerante(origem_tmp, destino_final, tentativas=6, espera=0.5):
+    """os.replace com as mesmas tentativas/tolerância acima. Aqui, ao
+    contrário da limpeza de temporários, uma falha final DEVE propagar: sem
+    isso o arquivo de saída não foi gerado."""
+    ultimo_erro = None
+    for tentativa in range(tentativas):
+        try:
+            os.replace(origem_tmp, destino_final)
+            return
+        except PermissionError as exc:
+            ultimo_erro = exc
+            time.sleep(espera)
+    raise ultimo_erro
+
+
 def processar_docx(origem, destino):
     """Gera `destino` a partir de `origem`: texto anonimizado e imagens
     removidas. Lê a origem SOMENTE para leitura. Levanta exceção em caso de
@@ -320,6 +385,7 @@ def processar_docx(origem, destino):
 
     destino_tmp1 = destino + ".tmp1"
     destino_tmp2 = destino + ".tmp2"
+    verificacao = None
     try:
         document.save(destino_tmp1)
         _remover_media_do_zip(destino_tmp1, destino_tmp2)
@@ -331,11 +397,18 @@ def processar_docx(origem, destino):
             raise ValueError(
                 f"ainda restam {len(verificacao.inline_shapes)} imagem(ns) inline após a remoção")
 
-        os.replace(destino_tmp2, destino)
+        _substituir_arquivo_tolerante(destino_tmp2, destino)
     finally:
-        for tmp in (destino_tmp1, destino_tmp2):
-            if os.path.exists(tmp):
-                os.remove(tmp)
+        # Solta as referências aos objetos python-docx/lxml antes de tentar
+        # apagar os temporários — no Windows, um handle de arquivo ainda
+        # vivo (por exemplo, se a validação acima levantou uma exceção no
+        # meio da leitura do ZIP) impede a remoção do arquivo.
+        del document
+        if verificacao is not None:
+            del verificacao
+        gc.collect()
+        _remover_arquivo_tolerante(destino_tmp1)
+        _remover_arquivo_tolerante(destino_tmp2)
 
     return contagens, imagens_removidas
 
