@@ -51,46 +51,26 @@ try:
 except ImportError:
     sys.exit("ERRO: Pillow não instalado. Execute:  py -m pip install pillow")
 try:
-    import docx  # python-docx
+    import docx  # noqa: F401  (usado indiretamente via docx_common)
 except ImportError:
     sys.exit("ERRO: python-docx não instalado. Execute:  py -m pip install python-docx")
+
+from docx_common import (
+    DIM_MAXIMA, QUALIDADE_JPEG, TAMANHO_MINIMO, LIMITE_ALERTA, CHUNK,
+    EXT_JPEG, EXT_PNG, EXT_VETORIAL,
+    mb, fmt_mb, eh_media, ext, copiar_zipinfo, contagens_docx,
+    redimensionar_se_preciso,
+)
 
 # ----------------------------- Configuração ---------------------------------
 
 PASTA_ENTRADA_PADRAO = r"C:\Temp\RNCs\Originais"
 PASTA_SAIDA_PADRAO = r"C:\Temp\RNCs\Compactados"
 
-DIM_MAXIMA = 1600            # maior dimensão (px) após redimensionamento
-QUALIDADE_JPEG = 80          # qualidade de recompressão JPEG
-TAMANHO_MINIMO = 200 * 1024  # imagens menores que isso são ignoradas (200 KB)
-LIMITE_ALERTA = 100 * 1024 * 1024  # 100 MB — limiar do resumo final
-_CHUNK = 4 * 1024 * 1024     # cópia em blocos de 4 MB (economia de memória)
-
-# Bomba de descompressão / sanidade: não tenta abrir imagens absurdas
-Image.MAX_IMAGE_PIXELS = 300_000_000
-
-EXT_JPEG = {".jpg", ".jpeg", ".jpe", ".jfif"}
-EXT_PNG = {".png"}
-EXT_VETORIAL = {".emf", ".wmf", ".svg", ".wdp"}
-
-# ------------------------------- Utilitários ---------------------------------
-
-
-def _mb(n_bytes):
-    return n_bytes / (1024 * 1024)
-
-
-def _fmt_mb(n_bytes):
-    return f"{_mb(n_bytes):,.1f} MB".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-def _eh_media(nome):
-    return nome.replace("\\", "/").lower().startswith("word/media/")
-
-
-def _ext(nome):
-    return os.path.splitext(nome)[1].lower()
-
+# Aliases locais (compatibilidade com o restante do arquivo)
+_mb, _fmt_mb, _eh_media, _ext, _copiar_zipinfo, _contagens_docx = (
+    mb, fmt_mb, eh_media, ext, copiar_zipinfo, contagens_docx)
+_CHUNK = CHUNK
 
 # --------------------------- Compressão de imagem -----------------------------
 
@@ -116,15 +96,7 @@ def recomprimir_imagem(dados, nome):
             return None, "imagem animada (mantida)"
 
         img.load()
-        largura, altura = img.size
-        maior = max(largura, altura)
-        if maior > DIM_MAXIMA:
-            escala = DIM_MAXIMA / maior
-            novo_tam = (max(1, round(largura * escala)), max(1, round(altura * escala)))
-            # PNG com paleta: converter antes de redimensionar para não degradar
-            if img.mode == "P":
-                img = img.convert("RGBA" if "transparency" in img.info else "RGB")
-            img = img.resize(novo_tam, Image.LANCZOS)
+        img, _ = redimensionar_se_preciso(img)
 
         buf = io.BytesIO()
         if formato == "JPEG":
@@ -149,14 +121,6 @@ def recomprimir_imagem(dados, nome):
 
 
 # ------------------------------ Processamento --------------------------------
-
-
-def _copiar_zipinfo(item):
-    novo = zipfile.ZipInfo(filename=item.filename, date_time=item.date_time)
-    novo.compress_type = zipfile.ZIP_DEFLATED
-    novo.external_attr = item.external_attr
-    novo.create_system = item.create_system
-    return novo
 
 
 def processar_docx(origem, destino_tmp, log):
@@ -217,18 +181,6 @@ def processar_docx(origem, destino_tmp, log):
 
 
 # -------------------------------- Validação ----------------------------------
-
-
-def _contagens_docx(caminho):
-    documento = docx.Document(caminho)
-    contagens = (
-        len(documento.paragraphs),
-        len(documento.tables),
-        len(documento.inline_shapes),
-    )
-    del documento
-    gc.collect()
-    return contagens
 
 
 def validar(origem, gerado):
