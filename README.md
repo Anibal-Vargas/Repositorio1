@@ -131,3 +131,42 @@ py converter_png_jpeg.py --somente-grandes
 O resultado vai para `C:\Temp\RNCs\Compactados_v2` por padrão (não
 sobrescreve a saída da 1ª passada) e o log fica em
 `log_conversao_png_jpeg.txt`.
+
+## Extração de NCs para planilha: `extrair_ncs.py`
+
+Extrai **todas as não conformidades (NCs)** dos relatórios anonimizados
+(`.docx`) para uma única planilha Excel, **sem resumir nem reescrever nada**
+(cópia literal do texto). Os relatórios são abertos somente para leitura.
+
+Colunas geradas: `arquivo_origem`, `secao` (último título identificado —
+alta/média/baixa tensão, subestação, quadro etc.), `descricao_nc`,
+`itens_norma` (NR-10, NBR 5410, NBR 14039 etc.) e `solucao_proposta`.
+
+Formatos reconhecidos automaticamente, arquivo a arquivo:
+
+- **tabela-matriz** — cabeçalho tipo "Item | Descrição da não conformidade |
+  Embasamento | Solução proposta", uma NC por linha;
+- **blocos rotulados** — "Não conformidade nº 01", "Descrição: …",
+  "Norma/Embasamento: …", "Solução proposta/Recomendação: …", tanto em
+  tabelas rótulo→valor quanto em parágrafos corridos (rótulos reconhecidos
+  sem diferenciar maiúsculas/acentos; fotos e espaços para foto são ignorados).
+
+Ao final, o console e o `log_extracao_ncs.txt` (gravado ao lado da planilha)
+trazem o **total de NCs extraídas**, o **total por arquivo** e a lista de
+arquivos a **conferir manualmente**: zero NCs encontradas, erro de leitura,
+NCs com campo vazio ou arquivos que não são `.docx`.
+
+### Uso (Windows)
+
+Com os caminhos padrão (`C:\Temp\RNCs\Anonimizados` →
+`C:\Temp\RNCs\Planilhas\Extracao_NCs_bruta.xlsx`):
+
+```bat
+py extrair_ncs.py
+```
+
+Ou informando os caminhos:
+
+```bat
+py extrair_ncs.py --entrada "C:\Temp\RNCs\Anonimizados" --saida "C:\Temp\RNCs\Planilhas\Extracao_NCs_bruta.xlsx"
+```
