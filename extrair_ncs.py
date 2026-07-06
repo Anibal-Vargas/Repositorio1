@@ -81,8 +81,10 @@ ROTULOS = {
         "anomalia", "irregularidade constatada", "irregularidade",
     ],
     "norma": [
-        "embasamento tecnico normativo", "embasamento tecnico",
-        "embasamento normativo", "embasamento", "fundamentacao normativa",
+        "embasamento na norma regulamentadora", "embasamento na norma",
+        "embasamento nas normas", "embasamento tecnico normativo",
+        "embasamento tecnico", "embasamento normativo", "embasamento",
+        "fundamentacao normativa",
         "fundamentacao tecnica", "fundamentacao", "base normativa",
         "referencia normativa", "referencias normativas",
         "itens da norma", "item da norma", "itens de norma",
@@ -147,15 +149,21 @@ def rotulo_prefixo(texto):
             resto_norm = norm[len(rotulo):]
             if resto_norm and not re.match(r"^\s*(n?[ºo°\.]?\s*\d{1,4})?\s*[:\-–—.)]", resto_norm):
                 continue  # rótulo seguido de palavra comum: não é rótulo
-            # Localiza no texto ORIGINAL o ponto equivalente ao fim do rótulo
-            # + separador, para devolver o valor sem perder acentos/caixa.
-            m = re.match(
-                r"^\s*\S+(?:\s+\S+){%d}\s*(n?[ºo°\.]?\s*\d{1,4})?\s*[:\-–—.)]*\s*"
-                % (len(rotulo.split()) - 1),
-                texto,
-            )
-            resto = texto[m.end():].strip() if m else ""
-            return categoria, resto
+            # Localiza no texto ORIGINAL o fim das palavras do rótulo, para
+            # devolver o valor sem perder acentos/caixa.
+            m = re.match(r"^\s*\S+(?:\s+\S+){%d}" % (len(rotulo.split()) - 1), texto)
+            if not m:
+                return categoria, ""
+            resto = texto[m.end():]
+            # Remove a numeração/separador do PRÓPRIO rótulo ("Foto 12:",
+            # "Descrição -"), mas só se o separador ainda não veio grudado na
+            # última palavra ("norma:") — senão "norma: 10.2.8.3" perderia o
+            # "10." do início do valor.
+            if not re.search(r"[:\-–—.)]\s*$", m.group(0)):
+                m2 = re.match(r"^\s*(?:n?[ºo°\.]?\s*\d{1,4})?\s*[:\-–—.)]+\s*", resto)
+                if m2:
+                    resto = resto[m2.end():]
+            return categoria, resto.strip()
     return None, None
 
 
@@ -170,19 +178,61 @@ def rotulo_exato(texto):
     return None
 
 
-def eh_titulo_secao(paragrafo):
-    """True se o parágrafo parece um título de seção (estilo Heading/Título
-    ou texto curto com palavra-chave de seção elétrica)."""
+# Legenda de figura/tabela, ex.: "Figura 35 – Abertura na parede"
+RE_LEGENDA = re.compile(r"^(figura|tabela|foto)\s*\d{1,4}\s*[-–—:.]", re.IGNORECASE)
+
+
+def eh_legenda(paragrafo):
+    """True se o parágrafo é legenda de figura/tabela — deve ser PULADO sem
+    interromper o campo em preenchimento (a legenda fica no meio do texto)."""
+    estilo = (paragrafo.style.name or "").lower() if paragrafo.style else ""
+    if any(chave in estilo for chave in ("legenda", "caption", "figura")):
+        return True
+    return bool(RE_LEGENDA.match(paragrafo.text.strip()))
+
+
+def eh_titulo(paragrafo):
+    """True se o parágrafo parece um título (estilo Heading/Título ou texto
+    curto com palavra-chave de seção elétrica). A distinção entre título de
+    SEÇÃO e título de NC é feita depois, por lookahead (titulo_inicia_nc)."""
     texto = paragrafo.text.strip()
-    if not texto or len(texto) > 120:
+    if not texto or len(texto) > 200:
         return False
     estilo = (paragrafo.style.name or "").lower() if paragrafo.style else ""
     if estilo.startswith(("heading", "título", "titulo", "title")):
-        return True
+        return not eh_legenda(paragrafo)
     norm = normalizar(texto)
-    if RE_SECAO.search(norm) and not rotulo_prefixo(texto)[0] and not RE_INICIO_NC.match(norm):
+    if RE_SECAO.search(norm) and not rotulo_prefixo(texto)[0] and not RE_INICIO_NC.match(texto):
         # Título costuma ser curto e sem pontuação final de frase
         return len(norm) <= 90 and not norm.endswith((".", ";"))
+    return False
+
+
+def titulo_inicia_nc(blocos, indice, alcance=15):
+    """Decide se o título em blocos[indice] é o título de UMA NC (relatórios
+    em que cada NC tem seu próprio título, seguido de "Descrição:" /
+    "Embasamento:" / "Solução:") ou um título de SEÇÃO.
+
+    Regra: é título de NC se um rótulo de campo aparecer nos próximos
+    parágrafos ANTES do próximo título, tabela ou "NC nº X" — nesses casos o
+    conteúdo rotulado pertence ao título; caso contrário, é seção."""
+    examinados = 0
+    for bloco in blocos[indice + 1:]:
+        if isinstance(bloco, Table):
+            return False
+        texto = bloco.text.strip()
+        if not texto:
+            continue
+        if eh_legenda(bloco):
+            continue
+        if eh_titulo(bloco) or RE_INICIO_NC.match(texto):
+            return False
+        categoria, _ = rotulo_prefixo(texto)
+        if categoria in ("descricao", "norma", "solucao"):
+            return True
+        examinados += 1
+        if examinados >= alcance:
+            return False
     return False
 
 
@@ -269,7 +319,9 @@ class ColetorNCs:
     def campo(self, categoria, valor):
         """Registra um rótulo encontrado (com valor possivelmente vazio)."""
         if categoria == "foto":
-            self._campo_ativo = None  # ignora fotos/legendas que seguirem
+            # Marcador "Foto:" é pulado SEM interromper o campo ativo — nos
+            # relatórios reais a descrição continua depois das fotos, e
+            # interromper o campo descartaria esse texto.
             return
         # Um SEGUNDO rótulo "Descrição:" indica que começou OUTRA NC.
         # (Se a descrição atual veio só do título "NC nº X — ...", o rótulo
@@ -393,15 +445,22 @@ def extrair_arquivo(caminho):
         return [], f"não foi possível abrir: {e}"
     coletor = ColetorNCs(nome)
     try:
-        for bloco in iter_blocos(documento):
+        blocos = list(iter_blocos(documento))
+        for indice, bloco in enumerate(blocos):
             if isinstance(bloco, Table):
                 processar_tabela(bloco, coletor)
                 continue
             texto = bloco.text.strip()
             if not texto:
                 continue
-            if eh_titulo_secao(bloco):
-                coletor.definir_secao(texto)
+            if eh_legenda(bloco):
+                continue  # legenda de figura: pula sem interromper o campo
+            if eh_titulo(bloco):
+                if titulo_inicia_nc(blocos, indice):
+                    # O título é parte da NC: vira a 1ª linha da descrição
+                    coletor.iniciar_nc(texto)
+                else:
+                    coletor.definir_secao(texto)
                 continue
             m = RE_INICIO_NC.match(texto)
             if m and len(texto) <= 200:

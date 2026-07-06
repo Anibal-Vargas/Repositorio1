@@ -144,12 +144,21 @@ alta/média/baixa tensão, subestação, quadro etc.), `descricao_nc`,
 
 Formatos reconhecidos automaticamente, arquivo a arquivo:
 
+- **título por NC** (formato dos relatórios reais) — cada NC começa com um
+  parágrafo de título (estilo "Título (1.1.1)" ou similar), seguido de
+  "Descrição: …", "Foto:", "Embasamento na norma: …" e "Solução: …"; o
+  título vira a 1ª linha da descrição e títulos de nível superior (ex.:
+  "Documentais") viram a coluna `secao`;
 - **tabela-matriz** — cabeçalho tipo "Item | Descrição da não conformidade |
   Embasamento | Solução proposta", uma NC por linha;
 - **blocos rotulados** — "Não conformidade nº 01", "Descrição: …",
   "Norma/Embasamento: …", "Solução proposta/Recomendação: …", tanto em
-  tabelas rótulo→valor quanto em parágrafos corridos (rótulos reconhecidos
-  sem diferenciar maiúsculas/acentos; fotos e espaços para foto são ignorados).
+  tabelas rótulo→valor quanto em parágrafos corridos.
+
+Rótulos são reconhecidos sem diferenciar maiúsculas/acentos. Marcadores
+"Foto:" e legendas ("Figura 35 – …") são pulados **sem interromper** o campo
+em preenchimento — texto de descrição que continua depois de uma foto é
+preservado.
 
 Ao final, o console e o `log_extracao_ncs.txt` (gravado ao lado da planilha)
 trazem o **total de NCs extraídas**, o **total por arquivo** e a lista de
