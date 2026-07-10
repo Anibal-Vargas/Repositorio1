@@ -1,3 +1,11 @@
+# Ferramentas para relatórios de inspeção elétrica
+
+- `reduzir_docx.py` / `converter_png_jpeg.py` — redução do tamanho dos .docx
+  (compressão das fotos embutidas), documentados abaixo;
+- `consolidar_rncs.py` — consolidação das não conformidades da categoria
+  **"Instalações elétricas em más condições"** em uma planilha Excel única
+  (ver seção própria no fim deste arquivo).
+
 # Redução de relatórios .docx (compressão de fotos embutidas)
 
 Script para reduzir o tamanho de relatórios técnicos em Word (.docx) de 200+ MB,
@@ -131,3 +139,66 @@ py converter_png_jpeg.py --somente-grandes
 O resultado vai para `C:\Temp\RNCs\Compactados_v2` por padrão (não
 sobrescreve a saída da 1ª passada) e o log fica em
 `log_conversao_png_jpeg.txt`.
+
+# Consolidação de não conformidades: `consolidar_rncs.py`
+
+Percorre os relatórios `.pdf` e `.docx` de uma pasta, localiza em cada um a
+seção **"Instalações elétricas em más condições"** (aceitando variações como
+"Instalações em más condições de conservação" e "Instalações elétricas em mau
+estado") e consolida as não conformidades dessa categoria em uma planilha
+única, eliminando duplicatas entre relatórios.
+
+## O que o script faz
+
+1. Lista os `.pdf`/`.docx` da pasta e **pede confirmação** antes de prosseguir;
+2. Em cada relatório, localiza a seção da categoria pelo título (estilos de
+   título do Word, numeração `4.2 …` ou linha em caixa alta). Relatórios sem a
+   seção são **pulados** e registrados no log; NCs de outras seções nunca são
+   incluídas;
+3. Extrai as NCs da seção — itens numerados (`4.2.1`, `4.2.1.1`), marcadores
+   ou tabelas com colunas de descrição/norma/solução — preservando a
+   hierarquia de subitens e ignorando legendas de fotos. De cada NC captura:
+   - **descrição** (texto fiel do relatório);
+   - **item de norma** (rótulos como "Norma:"/"Embasamento:" ou referências
+     NR-10 / ABNT NBR reconhecidas no texto);
+   - **solução proposta** (rótulos como "Solução proposta:"/"Ação corretiva:").
+   Campo ausente no relatório recebe **`[NÃO CONSTA NO RELATÓRIO]`**; trecho
+   ilegível recebe **`[REVISAR]`** e vai para o log — nada é inventado;
+4. **Consolida duplicatas** entre relatórios (descrições iguais, uma contida
+   na outra, ou com similaridade ≥ limiar — padrão 0,85, ajustável com
+   `--limiar`), mantendo a redação mais completa, a frequência e a lista de
+   relatórios de origem;
+5. PDFs **escaneados** (sem texto selecionável) não são adivinhados: entram no
+   log como "requer OCR" e o script pergunta se deve continuar sem eles
+   (aplique OCR — ex.: `ocrmypdf` — e rode de novo para incluí-los);
+6. Mostra a **amostra das 5 primeiras linhas** para validação e, após
+   confirmação, grava na própria pasta:
+   - `nao_conformidades_consolidadas.xlsx` — colunas ID, Não conformidade /
+     Subitem, Descrição, Item da norma técnica, Solução proposta, Frequência e
+     Relatórios de origem; cabeçalho destacado, filtros ativados, painel
+     congelado e larguras ajustadas;
+   - `log_processamento.txt` — relatórios processados/pulados (com motivo),
+     NCs extraídas por relatório, avisos de revisão e total após consolidação.
+
+Os relatórios originais são abertos **somente para leitura** e nada é
+sobrescrito sem confirmação explícita.
+
+## Uso (Windows)
+
+```bat
+py -m pip install -r requirements.txt
+py consolidar_rncs.py
+```
+
+Com as opções disponíveis:
+
+```bat
+py consolidar_rncs.py --pasta "C:\Temp\RNCs\Compactados"
+py consolidar_rncs.py --limiar 0.90   & rem duplicatas só com similaridade maior
+py consolidar_rncs.py --sim           & rem sem perguntas (uso em lote)
+```
+
+Como a detecção de seções/itens é heurística (relatórios variam de formato),
+**revise a amostra e o log**: se algum relatório for pulado indevidamente ou
+alguma NC vier incompleta, ajuste os títulos/variações em `VARIANTES_TITULO`
+ou os rótulos em `ROTULOS_NORMA`/`ROTULOS_SOLUCAO` no início do script.
