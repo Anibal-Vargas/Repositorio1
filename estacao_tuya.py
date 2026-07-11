@@ -44,6 +44,16 @@ DEVICE_ID = os.environ.get("TUYA_DEVICE_ID", "eb10ba24e88d3576acvgwm")
 # Western America Data Center
 ENDPOINT = os.environ.get("TUYA_ENDPOINT", "https://openapi.tuyaus.com")
 
+# Todos os data centers da Tuya, para o modo --testar-endpoints
+ENDPOINTS_CONHECIDOS = {
+    "Western America": "https://openapi.tuyaus.com",
+    "Eastern America": "https://openapi-ueaz.tuyaus.com",
+    "Central Europe": "https://openapi.tuyaeu.com",
+    "Western Europe": "https://openapi-weaz.tuyaeu.com",
+    "India": "https://openapi.tuyain.com",
+    "China": "https://openapi.tuyacn.com",
+}
+
 # CSV salvo no mesmo diretório do script (funciona igual quando rodado pelo cron)
 CSV_PATH = Path(__file__).resolve().parent / "estacao.csv"
 
@@ -115,7 +125,26 @@ def gravar_csv(leituras: dict) -> None:
     print(f"{agora} - {len(leituras)} leituras gravadas em {CSV_PATH}")
 
 
+def testar_endpoints() -> None:
+    """Tenta obter o token em cada data center e mostra qual aceita as credenciais."""
+    for nome, url in ENDPOINTS_CONHECIDOS.items():
+        api = TuyaOpenAPI(url, ACCESS_ID, ACCESS_SECRET)
+        try:
+            token = api.connect()
+        except Exception as exc:  # noqa: BLE001 - queremos seguir testando os demais
+            print(f"[FALHA] {nome} ({url}): erro de conexão: {exc}")
+            continue
+        if token.get("success"):
+            print(f"[OK]    {nome} ({url}): token obtido — use este endpoint!")
+        else:
+            print(f"[FALHA] {nome} ({url}): code={token.get('code')} - {token.get('msg')}")
+
+
 def main() -> None:
+    if "--testar-endpoints" in sys.argv:
+        testar_endpoints()
+        return
+
     leituras = coletar_status()
     if not leituras:
         print("Aviso: o device não retornou nenhum status.", file=sys.stderr)
