@@ -11,9 +11,9 @@ Uso:
 Dependências:
     pip install tuya-connector-python openpyxl
 
-As credenciais podem ser sobrescritas por variáveis de ambiente
-(TUYA_ACCESS_ID, TUYA_ACCESS_SECRET, TUYA_DEVICE_ID, TUYA_ENDPOINT),
-o que é recomendado se este arquivo for versionado em repositório público.
+As credenciais são lidas das variáveis de ambiente TUYA_ACCESS_ID,
+TUYA_ACCESS_SECRET e TUYA_DEVICE_ID (no GitHub Actions, via Secrets;
+localmente, via arquivo tuya.env — veja tuya.env.exemplo).
 """
 
 import os
@@ -39,10 +39,41 @@ from tuya_connector import TuyaOpenAPI
 
 # ----------------------------------------------------------------------
 # Configuração (Project code: p1752408794336gqwnmw)
+#
+# As credenciais vêm de variáveis de ambiente (no GitHub Actions, dos
+# Secrets do repositório). Para rodar localmente, crie um arquivo
+# "tuya.env" ao lado deste script (veja tuya.env.exemplo) — ele nunca
+# deve ser commitado.
 # ----------------------------------------------------------------------
-ACCESS_ID = os.environ.get("TUYA_ACCESS_ID", "aq7ynn9sve3u9n8gku7w")
-ACCESS_SECRET = os.environ.get("TUYA_ACCESS_SECRET", "d22b3801be26467c82301367c1bbd17a")
-DEVICE_ID = os.environ.get("TUYA_DEVICE_ID", "eb10ba24e88d3576acvgwm")
+
+
+def _carregar_env_local() -> None:
+    """Carrega variáveis de um tuya.env ao lado do script, se existir."""
+    arquivo = Path(__file__).resolve().parent / "tuya.env"
+    if not arquivo.exists():
+        return
+    for linha in arquivo.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#") or "=" not in linha:
+            continue
+        chave, valor = linha.split("=", 1)
+        os.environ.setdefault(chave.strip(), valor.strip())
+
+
+def _config_obrigatoria(nome: str) -> str:
+    valor = os.environ.get(nome)
+    if not valor:
+        raise SystemExit(
+            f"Credencial ausente: defina a variável de ambiente {nome} "
+            "(ou crie o arquivo tuya.env ao lado do script; veja tuya.env.exemplo)."
+        )
+    return valor
+
+
+_carregar_env_local()
+ACCESS_ID = _config_obrigatoria("TUYA_ACCESS_ID")
+ACCESS_SECRET = _config_obrigatoria("TUYA_ACCESS_SECRET")
+DEVICE_ID = _config_obrigatoria("TUYA_DEVICE_ID")
 
 # Western America Data Center
 ENDPOINT = os.environ.get("TUYA_ENDPOINT", "https://openapi.tuyaus.com")
