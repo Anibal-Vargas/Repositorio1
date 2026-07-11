@@ -38,16 +38,34 @@ CSV_PATH = Path(__file__).resolve().parent / "estacao.csv"
 TIMESTAMP_COL = "timestamp"
 
 
+# Dicas para os erros mais comuns da API Tuya, indexadas pelo campo "code"
+DICAS_ERRO = {
+    1004: "Assinatura inválida: confira o Access Secret e sincronize o relógio do computador.",
+    1010: "Token inválido: geralmente o endpoint não corresponde ao data center do projeto.",
+    1106: "Sem permissão: verifique se o device está vinculado a este projeto no console Tuya.",
+    1109: "Endpoint errado: confira o data center do projeto no console Tuya.",
+    2007: "Data center incorreto para estas credenciais: ajuste o ENDPOINT.",
+    28841105: "Assinatura do plano IoT Core expirou: renove em Cloud > projeto > Service API.",
+}
+
+
+def _detalhar_erro(resposta: dict, contexto: str) -> str:
+    code = resposta.get("code")
+    msg = f"{contexto} (code={code}): {resposta.get('msg')}"
+    dica = DICAS_ERRO.get(code)
+    return f"{msg}\nDica: {dica}" if dica else msg
+
+
 def coletar_status() -> dict:
     """Conecta na nuvem Tuya e devolve {codigo: valor} com todos os status do device."""
     api = TuyaOpenAPI(ENDPOINT, ACCESS_ID, ACCESS_SECRET)
-    api.connect()
+    token = api.connect()
+    if not token.get("success"):
+        raise RuntimeError(_detalhar_erro(token, "Falha ao obter token na API Tuya"))
 
     resposta = api.get(f"/v1.0/iot-03/devices/{DEVICE_ID}/status")
     if not resposta.get("success"):
-        raise RuntimeError(
-            f"Falha na API Tuya (code={resposta.get('code')}): {resposta.get('msg')}"
-        )
+        raise RuntimeError(_detalhar_erro(resposta, "Falha ao consultar o device"))
 
     # resposta["result"] é uma lista como:
     # [{"code": "va_temperature", "value": 215}, {"code": "va_humidity", "value": 60}, ...]
