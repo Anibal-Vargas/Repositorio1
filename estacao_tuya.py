@@ -16,9 +16,21 @@ o que é recomendado se este arquivo for versionado em repositório público.
 
 import csv
 import os
+import socket
 import sys
 from datetime import datetime
 from pathlib import Path
+
+# A Tuya valida a região do IP de origem e costuma rejeitar IPv6 com o erro
+# 1114 ("your ip don't have access to this API"). Forçamos IPv4 em todas as
+# conexões. Defina TUYA_PERMITIR_IPV6=1 para desativar este ajuste.
+if os.environ.get("TUYA_PERMITIR_IPV6") != "1":
+    _getaddrinfo_original = socket.getaddrinfo
+
+    def _getaddrinfo_somente_ipv4(host, port, family=0, *args, **kwargs):
+        return _getaddrinfo_original(host, port, socket.AF_INET, *args, **kwargs)
+
+    socket.getaddrinfo = _getaddrinfo_somente_ipv4
 
 from tuya_connector import TuyaOpenAPI
 
@@ -44,6 +56,8 @@ DICAS_ERRO = {
     1010: "Token inválido: geralmente o endpoint não corresponde ao data center do projeto.",
     1106: "Sem permissão: verifique se o device está vinculado a este projeto no console Tuya.",
     1109: "Endpoint errado: confira o data center do projeto no console Tuya.",
+    1114: "IP de origem rejeitado: se o IP mostrado for IPv6, force IPv4; "
+    "se for IPv4, o data center do projeto não atende a sua região.",
     2007: "Data center incorreto para estas credenciais: ajuste o ENDPOINT.",
     28841105: "Assinatura do plano IoT Core expirou: renove em Cloud > projeto > Service API.",
 }
