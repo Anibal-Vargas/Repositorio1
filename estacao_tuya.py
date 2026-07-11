@@ -63,6 +63,37 @@ NOME_ABA = "Estação"
 
 TIMESTAMP_COL = "timestamp"
 
+# A Tuya envia estas grandezas multiplicadas por 10 (ex.: 153 = 15,3 °C).
+# Os valores destes códigos são divididos por 10 antes de ir para a planilha.
+CODIGOS_DIVIDIR_POR_10 = {
+    "dew_point_temp",
+    "feellike_temp",
+    "heat_index",
+    "rain_1h",
+    "rain_24h",
+    "rain_rate",
+    "temp_current",
+    "temp_current_external",
+    "temp_current_external_1",
+    "temp_current_external_2",
+    "temp_current_external_3",
+    "windchill_index",
+    "windspeed_avg",
+    "windspeed_gust",
+}
+
+
+def ajustar_escala(leituras: dict) -> dict:
+    """Divide por 10 os valores dos códigos marcados, sem arredondar (153 -> 15.3)."""
+    ajustadas = {}
+    for codigo, valor in leituras.items():
+        if codigo in CODIGOS_DIVIDIR_POR_10 and isinstance(valor, (int, float)) and not isinstance(valor, bool):
+            # round(_, 1) só remove o ruído binário do float; como o valor original é
+            # inteiro em décimos, a divisão por 10 é exata e nada é arredondado.
+            valor = round(valor / 10, 1)
+        ajustadas[codigo] = valor
+    return ajustadas
+
 # Dicas para os erros mais comuns da API Tuya, indexadas pelo campo "code"
 DICAS_ERRO = {
     1004: "Assinatura inválida: confira o Access Secret e sincronize o relógio do computador.",
@@ -181,7 +212,7 @@ def main() -> None:
     if not leituras:
         print("Aviso: o device não retornou nenhum status.", file=sys.stderr)
         return
-    gravar_xlsx(leituras)
+    gravar_xlsx(ajustar_escala(leituras))
 
 
 if __name__ == "__main__":
