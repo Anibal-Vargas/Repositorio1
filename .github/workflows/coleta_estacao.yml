@@ -2,8 +2,10 @@ name: Coleta da estação meteorológica
 
 on:
   schedule:
-    # A cada hora, no minuto 0 (horário UTC; pode atrasar alguns minutos)
-    - cron: "0 * * * *"
+    # A cada hora, no minuto 43 (horário UTC). O minuto 0 é o slot mais
+    # disputado do GitHub e disparos nele são atrasados ou descartados
+    # sob carga; um minuto incomum torna o agendamento muito mais regular.
+    - cron: "43 * * * *"
   # Permite disparar manualmente pela aba Actions, para testar
   workflow_dispatch:
 
