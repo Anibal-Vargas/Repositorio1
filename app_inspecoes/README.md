@@ -1,8 +1,15 @@
-# Inspeções Elétricas — PWA offline-first
+# Inspeções de conformidade Técnica/NR-10 – Nord Consult — PWA offline-first
 
 Aplicativo de campo para registro de não conformidades (NCs) em inspeções de
-instalações elétricas. 100% offline após o primeiro carregamento, sem backend:
-todos os dados (fotos, áudios, texto) ficam no IndexedDB do dispositivo.
+conformidade técnica/NR-10. 100% offline após o primeiro carregamento, sem
+backend: todos os dados (fotos, áudios, texto) ficam no IndexedDB do
+dispositivo.
+
+Identidade visual: fundo branco com a logo Nord Consult centralizada como
+marca-d'água e paleta laranja da marca. A logo em `icons/logo-nord.png` é uma
+recriação vetorial aproximada — para usar a arte oficial, substitua esse
+arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
+`VERSAO` em `sw.js`.
 
 ## Estado atual (Fases 1 e 2 concluídas)
 

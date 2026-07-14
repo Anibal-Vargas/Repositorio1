@@ -36,8 +36,8 @@ export async function telaIdentificacao() {
   );
 
   return el('main', { class: 'conteudo tela-identificacao' },
-    el('div', { class: 'logo', 'aria-hidden': 'true' }, '⚡'),
-    el('h1', {}, 'Inspeções Elétricas'),
+    el('img', { class: 'logo-marca', src: 'icons/logo-nord.png', alt: 'Nord Consult' }),
+    el('h1', {}, 'Inspeções de conformidade Técnica/NR-10 – Nord Consult'),
     el('p', {}, 'Identifique-se para começar. Isso é pedido apenas uma vez.'),
     formulario,
   );

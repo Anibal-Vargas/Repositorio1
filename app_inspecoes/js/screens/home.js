@@ -21,7 +21,7 @@ export async function telaHome() {
   );
 
   return [
-    cabecalho('Inspeções Elétricas', null, `Inspetor: ${inspetor.nome}`),
+    cabecalho('Nord Consult — Inspeções NR-10', null, `Inspetor: ${inspetor.nome}`),
     el('main', { class: 'conteudo' },
       el('button', {
         class: 'btn btn-destaque btn-grande',

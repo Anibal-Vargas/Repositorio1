@@ -1,15 +1,15 @@
 {
-  "name": "Inspeções de Instalações Elétricas",
-  "short_name": "Inspeções",
-  "description": "Registro de não conformidades em inspeções elétricas de campo — 100% offline",
+  "name": "Inspeções de conformidade Técnica/NR-10 – Nord Consult",
+  "short_name": "Nord Inspeções",
+  "description": "Registro de não conformidades em inspeções de conformidade técnica/NR-10 — 100% offline",
   "lang": "pt-BR",
   "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0d2a54",
-  "theme_color": "#0d2a54",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "icons/icon-192.png",
