@@ -1,0 +1,76 @@
+# Inspeções Elétricas — PWA offline-first
+
+Aplicativo de campo para registro de não conformidades (NCs) em inspeções de
+instalações elétricas. 100% offline após o primeiro carregamento, sem backend:
+todos os dados (fotos, áudios, texto) ficam no IndexedDB do dispositivo.
+
+## Estado atual (Fases 1 e 2 concluídas)
+
+- **PWA instalável**: `manifest.json`, Service Worker com pré-cache de todos os
+  assets e atualização automática (incremente `VERSAO` em `sw.js` ao publicar).
+- **Identificação do inspetor** apenas no primeiro uso.
+- **Home**: Nova inspeção / Retomar inspeção / Exportar (placeholder até a
+  Fase 3) + espaço de armazenamento usado.
+- **Nova inspeção**: seleção/cadastro de cliente + tipo (Geral funcional;
+  Subestações, Painéis e Documental chegam na Fase 4).
+- **Inspeção Geral**: áreas e sub-áreas (1 nível), NCs com numeração
+  sequencial (NC-001, NC-002…), até 20 fotos por NC (câmera nativa via
+  `input capture`, compressão Canvas para máx. 1920px / JPEG 0.8), descrição
+  opcional com salvamento automático e áudios opcionais (MediaRecorder).
+- **Retomar** lista inspeções abertas com progresso (áreas, NCs, fotos).
+- `navigator.storage.persist()` solicitado no primeiro uso.
+
+Fluxo de campo: dentro de uma área, **NC + FOTO** → disparo da câmera →
+confirmar = 3 toques, com tudo salvo automaticamente.
+
+## Estrutura
+
+```
+app_inspecoes/
+├── index.html          # shell único (SPA com rotas por hash)
+├── manifest.json       # manifesto PWA (pt-BR, standalone)
+├── sw.js               # service worker (cache offline + auto-atualização)
+├── icons/              # ícones gerados (192/512 + maskable)
+├── vendor/             # dexie.min.js e jszip.min.js vendorizados (sem CDN)
+├── css/styles.css      # estilos (botões ≥48px, alto contraste)
+└── js/
+    ├── app.js          # roteador + registro do service worker
+    ├── db.js           # esquema Dexie e acesso a dados
+    ├── camera.js       # captura + compressão de fotos
+    ├── audio.js        # gravação de áudio (MediaRecorder)
+    ├── storage.js      # persistência e estimativa de espaço
+    ├── ui.js           # utilitários de interface
+    └── screens/        # uma tela por arquivo
+```
+
+## Como testar no celular (rede local)
+
+1. No computador, dentro desta pasta:
+   ```bash
+   cd app_inspecoes
+   python3 -m http.server 8000
+   ```
+2. Descubra o IP do computador na rede (`ip addr` ou `ipconfig`) e abra no
+   Chrome do celular: `http://SEU_IP:8000`.
+3. **Atenção**: fora de `localhost`, Service Worker e câmera/microfone exigem
+   HTTPS. Para teste completo no celular use uma destas opções:
+   - **Encaminhamento de porta do Chrome** (recomendado): celular via USB,
+     `chrome://inspect` → *Port forwarding* → `8000 → localhost:8000`; no
+     celular abra `http://localhost:8000` (localhost é considerado seguro).
+   - **GitHub Pages** ou outro host HTTPS estático (o app é 100% estático).
+4. No Chrome do celular: menu ⋮ → **Instalar app** (ou "Adicionar à tela
+   inicial"). Instalado, ative o modo avião e confira que tudo funciona.
+
+## Publicar atualização
+
+Edite os arquivos e **incremente `VERSAO` em `sw.js`**. Na próxima abertura
+com rede, o app baixa a versão nova e recarrega sozinho.
+
+## Pendente (Fases 3–5)
+
+- **Fase 3 — Exportação**: pacote ZIP (JSZip já vendorizado) com fotos, áudios
+  e JSON/relatório da inspeção; finalizar inspeção.
+- **Fase 4 — Demais tipos**: Subestações, Painéis e Documental (checklists
+  específicos).
+- **Fase 5 — Refinamentos**: edição/exclusão de áreas e clientes, busca,
+  relatório formatado, importação em outro dispositivo.

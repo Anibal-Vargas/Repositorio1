@@ -1,0 +1,87 @@
+// app.js — ponto de entrada: roteador por hash + registro do Service Worker.
+
+import { obterInspetor } from './db.js';
+import { toast } from './ui.js';
+import { telaIdentificacao } from './screens/identificacao.js';
+import { telaHome } from './screens/home.js';
+import { telaNovaInspecao } from './screens/novaInspecao.js';
+import { telaInspecao } from './screens/inspecao.js';
+import { telaNC } from './screens/nc.js';
+import { telaRetomar } from './screens/retomar.js';
+
+// Cada rota mapeia para uma função async tela(container, ...paramsCapturados).
+const ROTAS = [
+  { padrao: /^#\/identificacao$/, tela: telaIdentificacao },
+  { padrao: /^#\/home$/, tela: telaHome },
+  { padrao: /^#\/nova$/, tela: telaNovaInspecao },
+  { padrao: /^#\/retomar$/, tela: telaRetomar },
+  { padrao: /^#\/inspecao\/(\d+)$/, tela: telaInspecao },
+  { padrao: /^#\/inspecao\/(\d+)\/area\/(\d+)$/, tela: telaInspecao },
+  { padrao: /^#\/nc\/(\d+)$/, tela: telaNC },
+];
+
+let tokenNavegacao = 0;
+
+async function renderizar() {
+  const app = document.getElementById('app');
+  const hash = location.hash || '#/home';
+  const token = ++tokenNavegacao;
+
+  for (const rota of ROTAS) {
+    const combinacao = hash.match(rota.padrao);
+    if (!combinacao) continue;
+    const params = combinacao.slice(1).map(Number);
+    try {
+      const conteudo = await rota.tela(...params);
+      if (token !== tokenNavegacao) return; // usuário já navegou para outra tela
+      app.replaceChildren(...(Array.isArray(conteudo) ? conteudo : [conteudo]));
+      app.scrollTop = 0;
+      window.scrollTo(0, 0);
+    } catch (erro) {
+      console.error(erro);
+      if (token === tokenNavegacao) toast('Erro ao abrir a tela. Tente novamente.');
+    }
+    return;
+  }
+  location.hash = '#/home';
+}
+
+async function iniciar() {
+  registrarServiceWorker();
+
+  // Primeira vez: identifica o inspetor antes de qualquer outra tela.
+  const inspetor = await obterInspetor();
+  if (!inspetor) {
+    location.hash = '#/identificacao';
+  } else if (!location.hash || location.hash === '#/identificacao') {
+    location.hash = '#/home';
+  }
+
+  window.addEventListener('hashchange', renderizar);
+  renderizar();
+}
+
+function registrarServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.register('sw.js').then((registro) => {
+    // Procura atualização a cada retorno ao app (o SW novo usa skipWaiting).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registro.update();
+    });
+  }).catch((erro) => console.warn('Service Worker não registrado:', erro));
+
+  // Quando um SW novo assume, recarrega uma única vez para pegar a versão nova.
+  // Na primeira instalação (claim sem controlador anterior) não há o que
+  // recarregar — recarregar aí interromperia o usuário no meio de uma ação.
+  const tinhaControlador = !!navigator.serviceWorker.controller;
+  let recarregou = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!tinhaControlador || recarregou) return;
+    recarregou = true;
+    toast('Aplicativo atualizado.');
+    setTimeout(() => location.reload(), 600);
+  });
+}
+
+iniciar();
