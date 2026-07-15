@@ -42,7 +42,7 @@ body::before {
   z-index: 0;
   background: url('../icons/logo-nord.png') no-repeat center center;
   background-size: min(68vw, 400px);
-  opacity: 0.06;
+  opacity: 0.12;
   pointer-events: none;
 }
 
