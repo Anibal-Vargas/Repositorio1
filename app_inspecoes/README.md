@@ -11,12 +11,12 @@ recriação vetorial aproximada — para usar a arte oficial, substitua esse
 arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
 `VERSAO` em `sw.js`.
 
-## Estado atual (Fases 1 e 2 concluídas)
+## Estado atual (Fases 1, 2 e 3 concluídas)
 
 - **PWA instalável**: `manifest.json`, Service Worker com pré-cache de todos os
   assets e atualização automática (incremente `VERSAO` em `sw.js` ao publicar).
-- **Home**: Nova inspeção / Retomar inspeção / Exportar (placeholder até a
-  Fase 3) + espaço de armazenamento usado.
+- **Home**: Nova inspeção / Retomar inspeção / Exportar + espaço de
+  armazenamento usado.
 - **Nova inspeção** em tela única: inspetor (lista suspensa com a equipe
   Nord Consult + opção de digitar outro nome), cliente (lista suspensa +
   cadastro) e tipo (Geral funcional; Subestações, Painéis e Documental
@@ -26,6 +26,11 @@ arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
   `input capture`, compressão Canvas para máx. 1920px / JPEG 0.8), descrição
   opcional com salvamento automático e áudios opcionais (MediaRecorder).
 - **Retomar** lista inspeções abertas com progresso (áreas, NCs, fotos).
+- **Exportar**: pacote .zip por inspeção com `relatorio.html` (relatório
+  legível com fotos), `dados.json` (estruturado) e as pastas `fotos/` e
+  `audios/`. No Android abre a folha de compartilhamento (WhatsApp, Drive,
+  e-mail…); sem suporte, baixa o arquivo. Também permite finalizar e
+  reabrir inspeções.
 - `navigator.storage.persist()` solicitado na primeira abertura da Home.
 
 Fluxo de campo: dentro de uma área, **NC + FOTO** → disparo da câmera →
@@ -74,10 +79,8 @@ app_inspecoes/
 Edite os arquivos e **incremente `VERSAO` em `sw.js`**. Na próxima abertura
 com rede, o app baixa a versão nova e recarrega sozinho.
 
-## Pendente (Fases 3–5)
+## Pendente (Fases 4–5)
 
-- **Fase 3 — Exportação**: pacote ZIP (JSZip já vendorizado) com fotos, áudios
-  e JSON/relatório da inspeção; finalizar inspeção.
 - **Fase 4 — Demais tipos**: Subestações, Painéis e Documental (checklists
   específicos).
 - **Fase 5 — Refinamentos**: edição/exclusão de áreas e clientes, busca,

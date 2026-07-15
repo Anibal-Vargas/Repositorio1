@@ -2,7 +2,7 @@
 
 import { obterInspetor, listarInspecoesAbertas } from '../db.js';
 import { solicitarPersistencia, textoEspacoUsado } from '../storage.js';
-import { el, cabecalho, toast } from '../ui.js';
+import { el, cabecalho } from '../ui.js';
 
 export async function telaHome() {
   // Primeiro uso: pede armazenamento persistente para as fotos não serem
@@ -44,7 +44,7 @@ export async function telaHome() {
 
       el('button', {
         class: 'btn btn-secundario btn-grande',
-        onclick: () => toast('Exportação disponível na Fase 3.'),
+        onclick: () => { location.hash = '#/exportar'; },
       }, el('span', { class: 'icone' }, '📦'), 'Exportar'),
 
       rodape,

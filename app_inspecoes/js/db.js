@@ -75,6 +75,20 @@ export function listarInspecoesAbertas() {
   return db.inspecoes.where('status').equals('aberta').reverse().sortBy('atualizadoEm');
 }
 
+export function listarInspecoesFinalizadas() {
+  return db.inspecoes.where('status').equals('finalizada').reverse().sortBy('atualizadoEm');
+}
+
+export async function finalizarInspecao(id) {
+  await db.inspecoes.update(id, {
+    status: 'finalizada', finalizadaEm: Date.now(), atualizadoEm: Date.now(),
+  });
+}
+
+export async function reabrirInspecao(id) {
+  await db.inspecoes.update(id, { status: 'aberta', atualizadoEm: Date.now() });
+}
+
 function tocarInspecao(id) {
   return db.inspecoes.update(id, { atualizadoEm: Date.now() });
 }
