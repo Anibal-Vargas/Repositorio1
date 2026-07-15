@@ -49,14 +49,17 @@ export async function criarCliente(nome) {
 
 // ---------- inspeções ----------
 
-export async function criarInspecao(clienteId, tipo) {
-  const inspetor = await obterInspetor();
+export async function criarInspecao(clienteId, tipo, inspetorNome = null) {
+  if (inspetorNome === null) {
+    const inspetor = await obterInspetor();
+    inspetorNome = inspetor ? inspetor.nome : '';
+  }
   const agora = Date.now();
   const id = await db.inspecoes.add({
     clienteId,
     tipo,
     status: 'aberta',
-    inspetorNome: inspetor ? inspetor.nome : '',
+    inspetorNome,
     contadorNC: 0,
     criadoEm: agora,
     atualizadoEm: agora,

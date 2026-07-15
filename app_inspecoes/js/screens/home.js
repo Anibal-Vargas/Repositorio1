@@ -1,15 +1,17 @@
 // Home — Nova inspeção / Retomar / Exportar + espaço usado no rodapé.
 
 import { obterInspetor, listarInspecoesAbertas } from '../db.js';
-import { textoEspacoUsado, estaPersistente } from '../storage.js';
+import { solicitarPersistencia, textoEspacoUsado } from '../storage.js';
 import { el, cabecalho, toast } from '../ui.js';
 
 export async function telaHome() {
-  const [inspetor, abertas, espaco, persistente] = await Promise.all([
+  // Primeiro uso: pede armazenamento persistente para as fotos não serem
+  // apagadas pelo Android sob pressão de disco (só pede uma vez).
+  const persistente = await solicitarPersistencia();
+  const [inspetor, abertas, espaco] = await Promise.all([
     obterInspetor(),
     listarInspecoesAbertas(),
     textoEspacoUsado(),
-    estaPersistente(),
   ]);
 
   const rodape = el('div', { class: 'info-armazenamento' },
@@ -21,7 +23,8 @@ export async function telaHome() {
   );
 
   return [
-    cabecalho('Nord Consult — Inspeções NR-10', null, `Inspetor: ${inspetor.nome}`),
+    cabecalho('Nord Consult — Inspeções NR-10', null,
+      inspetor ? `Inspetor: ${inspetor.nome}` : 'Registro de não conformidades em campo'),
     el('main', { class: 'conteudo' },
       el('button', {
         class: 'btn btn-destaque btn-grande',

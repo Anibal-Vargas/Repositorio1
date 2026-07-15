@@ -203,7 +203,7 @@ input[type="text"], textarea, select {
   border: 1.5px solid var(--borda);
   border-radius: var(--raio);
 }
-input:focus, textarea:focus {
+input:focus, textarea:focus, select:focus {
   outline: 2px solid var(--laranja);
   outline-offset: 1px;
   border-color: var(--laranja);
@@ -352,29 +352,3 @@ textarea { resize: vertical; min-height: 100px; }
   text-align: center;
 }
 #toast.visivel { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ---------- Tela de identificação ---------- */
-.tela-identificacao {
-  justify-content: center;
-  text-align: center;
-  gap: 1.1rem;
-  padding: 2rem 1.25rem;
-}
-.tela-identificacao .logo-marca {
-  width: min(60vw, 260px);
-  margin: 0 auto;
-  display: block;
-}
-.tela-identificacao h1 {
-  color: var(--grafite);
-  font-size: 1.2rem;
-  line-height: 1.35;
-  margin: 0;
-}
-.tela-identificacao p { color: var(--cinza); margin: 0; font-size: 0.95rem; }
-.tela-identificacao form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  text-align: left;
-}

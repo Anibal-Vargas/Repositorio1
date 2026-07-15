@@ -15,17 +15,18 @@ arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
 
 - **PWA instalável**: `manifest.json`, Service Worker com pré-cache de todos os
   assets e atualização automática (incremente `VERSAO` em `sw.js` ao publicar).
-- **Identificação do inspetor** apenas no primeiro uso.
 - **Home**: Nova inspeção / Retomar inspeção / Exportar (placeholder até a
   Fase 3) + espaço de armazenamento usado.
-- **Nova inspeção**: seleção/cadastro de cliente + tipo (Geral funcional;
-  Subestações, Painéis e Documental chegam na Fase 4).
+- **Nova inspeção** em tela única: inspetor (lista suspensa com a equipe
+  Nord Consult + opção de digitar outro nome), cliente (lista suspensa +
+  cadastro) e tipo (Geral funcional; Subestações, Painéis e Documental
+  chegam na Fase 4). O inspetor escolhido vem pré-selecionado na próxima.
 - **Inspeção Geral**: áreas e sub-áreas (1 nível), NCs com numeração
   sequencial (NC-001, NC-002…), até 20 fotos por NC (câmera nativa via
   `input capture`, compressão Canvas para máx. 1920px / JPEG 0.8), descrição
   opcional com salvamento automático e áudios opcionais (MediaRecorder).
 - **Retomar** lista inspeções abertas com progresso (áreas, NCs, fotos).
-- `navigator.storage.persist()` solicitado no primeiro uso.
+- `navigator.storage.persist()` solicitado na primeira abertura da Home.
 
 Fluxo de campo: dentro de uma área, **NC + FOTO** → disparo da câmera →
 confirmar = 3 toques, com tudo salvo automaticamente.

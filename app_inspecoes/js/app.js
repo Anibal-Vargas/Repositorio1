@@ -1,8 +1,6 @@
 // app.js — ponto de entrada: roteador por hash + registro do Service Worker.
 
-import { obterInspetor } from './db.js';
 import { toast } from './ui.js';
-import { telaIdentificacao } from './screens/identificacao.js';
 import { telaHome } from './screens/home.js';
 import { telaNovaInspecao } from './screens/novaInspecao.js';
 import { telaInspecao } from './screens/inspecao.js';
@@ -11,7 +9,6 @@ import { telaRetomar } from './screens/retomar.js';
 
 // Cada rota mapeia para uma função async tela(container, ...paramsCapturados).
 const ROTAS = [
-  { padrao: /^#\/identificacao$/, tela: telaIdentificacao },
   { padrao: /^#\/home$/, tela: telaHome },
   { padrao: /^#\/nova$/, tela: telaNovaInspecao },
   { padrao: /^#\/retomar$/, tela: telaRetomar },
@@ -49,11 +46,9 @@ async function renderizar() {
 async function iniciar() {
   registrarServiceWorker();
 
-  // Primeira vez: identifica o inspetor antes de qualquer outra tela.
-  const inspetor = await obterInspetor();
-  if (!inspetor) {
-    location.hash = '#/identificacao';
-  } else if (!location.hash || location.hash === '#/identificacao') {
+  // '#/identificacao' existia até a v1.3; agora o inspetor é escolhido
+  // dentro de "Nova inspeção" (lista suspensa, junto com o cliente).
+  if (!location.hash || location.hash === '#/identificacao') {
     location.hash = '#/home';
   }
 
