@@ -26,11 +26,13 @@ arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
   `input capture`, compressão Canvas para máx. 1920px / JPEG 0.8), descrição
   opcional com salvamento automático e áudios opcionais (MediaRecorder).
 - **Retomar** lista inspeções abertas com progresso (áreas, NCs, fotos).
-- **Exportar**: pacote .zip por inspeção com `relatorio.html` (relatório
-  legível com fotos), `dados.json` (estruturado) e as pastas `fotos/` e
-  `audios/`. No Android abre a folha de compartilhamento (WhatsApp, Drive,
-  e-mail…); sem suporte, baixa o arquivo. Também permite finalizar e
-  reabrir inspeções.
+- **Exportar**: pacote .zip por inspeção no padrão de importação
+  `NCs/AA-MM-DD/<Área>/[<Sub-área>/]NC-XXX/` com `NC-XXX_foto01.jpg`,
+  `NC-XXX_audio01.webm` e `NC-XXX_desc01.txt` (data = registro da NC), mais
+  `relatorio.html` (relatório legível com fotos) e `dados.json`
+  (estruturado) na raiz. No Android abre a folha de compartilhamento
+  (WhatsApp, Drive, e-mail…); sem suporte, baixa o arquivo. Também permite
+  finalizar e reabrir inspeções.
 - `navigator.storage.persist()` solicitado na primeira abertura da Home.
 
 Fluxo de campo: dentro de uma área, **NC + FOTO** → disparo da câmera →

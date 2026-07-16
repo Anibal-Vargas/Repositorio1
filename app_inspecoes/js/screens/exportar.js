@@ -45,7 +45,7 @@ async function montar(conteudo) {
   }
 
   conteudo.append(el('p', { class: 'info-armazenamento' },
-    'O pacote .zip contém o relatório (relatorio.html), os dados (dados.json), as fotos e os áudios da inspeção.'));
+    'O pacote .zip contém a pasta NCs (data → área → sub-área → NC, com fotos, áudios e descrições), o relatório (relatorio.html) e os dados (dados.json).'));
 }
 
 async function cartaoInspecao(inspecao, conteudo) {

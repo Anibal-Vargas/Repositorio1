@@ -1,7 +1,11 @@
 // export.js — Fase 3: gera o pacote ZIP de uma inspeção.
-// O ZIP contém: relatorio.html (legível, com as fotos), dados.json
-// (estruturado, para reimportação/processamento) e as pastas fotos/ e
-// audios/. JSZip é carregado como script global em index.html.
+// Estrutura do pacote (padrão de importação Nord Consult):
+//   NCs/AA-MM-DD/<Área>/[<Sub-área>/]NC-XXX/
+//     NC-XXX_foto01.jpg…  NC-XXX_audio01.webm…  NC-XXX_desc01.txt
+// (a data é a do registro de cada NC; "AA-MM-DD" porque "/" não é
+// permitido em nome de pasta). Na raiz ficam ainda relatorio.html
+// (legível) e dados.json (estruturado).
+// JSZip é carregado como script global em index.html.
 
 import { db } from './db.js';
 
@@ -27,6 +31,26 @@ function sanitizarNomeArquivo(nome) {
     .trim().replace(/\s+/g, '_')
     .slice(0, 40);
   return limpo || 'inspecao';
+}
+
+/** Nome de pasta seguro (Windows/Android), preservando acentos e espaços. */
+function sanitizarPasta(nome) {
+  const limpo = String(nome)
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '')
+    .slice(0, 60);
+  return limpo || 'Sem nome';
+}
+
+/** Data da NC como pasta AA-MM-DD (ano-mês-dia, hora local). */
+function dataPasta(ts) {
+  const d = new Date(ts);
+  const AA = String(d.getFullYear() % 100).padStart(2, '0');
+  const MM = String(d.getMonth() + 1).padStart(2, '0');
+  const DD = String(d.getDate()).padStart(2, '0');
+  return `${AA}-${MM}-${DD}`;
 }
 
 function extensaoAudio(mime) {
@@ -62,37 +86,47 @@ export async function coletarDados(inspecaoId) {
 
   const totais = { areas: areas.length, ncs: ncs.length, fotos: 0, audios: 0 };
 
-  async function montarNC(nc) {
+  // caminhoArea: "Área" ou "Área/Sub-área" (já saneado para nome de pasta).
+  async function montarNC(nc, caminhoArea) {
     const fotos = await db.fotos.where('ncId').equals(nc.id).sortBy('criadoEm');
     const audios = await db.audios.where('ncId').equals(nc.id).sortBy('criadoEm');
     totais.fotos += fotos.length;
     totais.audios += audios.length;
+    const pasta = `NCs/${dataPasta(nc.criadoEm)}/${caminhoArea}/${nc.numero}`;
     return {
       numero: nc.numero,
       descricao: nc.descricao || '',
       criadoEm: nc.criadoEm,
+      pasta,
+      descricaoArquivo: nc.descricao
+        ? `${pasta}/${nc.numero}_desc01.txt`
+        : null,
       fotos: fotos.map((foto, i) => ({
-        arquivo: `fotos/${nc.numero}_foto-${String(i + 1).padStart(2, '0')}.jpg`,
+        arquivo: `${pasta}/${nc.numero}_foto${String(i + 1).padStart(2, '0')}.jpg`,
         blob: foto.blob,
       })),
       audios: audios.map((audio, i) => ({
-        arquivo: `audios/${nc.numero}_audio-${String(i + 1).padStart(2, '0')}.${extensaoAudio(audio.mime)}`,
+        arquivo: `${pasta}/${nc.numero}_audio${String(i + 1).padStart(2, '0')}.${extensaoAudio(audio.mime)}`,
         mime: audio.mime || 'audio/webm',
         blob: audio.blob,
       })),
     };
   }
 
-  const ncsDaArea = async (areaId) =>
-    Promise.all(ncs.filter((nc) => nc.areaId === areaId).map(montarNC));
+  const ncsDaArea = async (areaId, caminhoArea) =>
+    Promise.all(ncs.filter((nc) => nc.areaId === areaId).map((nc) => montarNC(nc, caminhoArea)));
 
   const arvore = [];
   for (const area of areas.filter((a) => (a.parentId ?? null) === null)) {
+    const pastaArea = sanitizarPasta(area.nome);
     const subareas = [];
     for (const sub of areas.filter((a) => a.parentId === area.id)) {
-      subareas.push({ nome: sub.nome, ncs: await ncsDaArea(sub.id) });
+      subareas.push({
+        nome: sub.nome,
+        ncs: await ncsDaArea(sub.id, `${pastaArea}/${sanitizarPasta(sub.nome)}`),
+      });
     }
-    arvore.push({ nome: area.nome, ncs: await ncsDaArea(area.id), subareas });
+    arvore.push({ nome: area.nome, ncs: await ncsDaArea(area.id, pastaArea), subareas });
   }
 
   return { inspecao, cliente, arvore, totais };
@@ -101,14 +135,15 @@ export async function coletarDados(inspecaoId) {
 // ---------- relatório HTML ----------
 
 function cartaoNC(nc) {
+  // encodeURI: os caminhos têm espaços/acentos (nomes de área).
   const fotos = nc.fotos.length
     ? `<div class="fotos">${nc.fotos.map((f) =>
-        `<a href="${f.arquivo}"><img src="${f.arquivo}" loading="lazy" alt="Foto da ${escapar(nc.numero)}"></a>`
+        `<a href="${encodeURI(f.arquivo)}"><img src="${encodeURI(f.arquivo)}" loading="lazy" alt="Foto da ${escapar(nc.numero)}"></a>`
       ).join('')}</div>`
     : '';
   const audios = nc.audios.length
     ? `<ul class="audios">${nc.audios.map((a) =>
-        `<li>🎙️ <a href="${a.arquivo}">${a.arquivo.split('/').pop()}</a></li>`
+        `<li>🎙️ <a href="${encodeURI(a.arquivo)}">${a.arquivo.split('/').pop()}</a></li>`
       ).join('')}</ul>`
     : '';
   return `<article class="nc">
@@ -182,7 +217,7 @@ function gerarRelatorioHTML(dados) {
   </div>
 </header>
 ${secoes || '<p class="vazio">Nenhuma área registrada.</p>'}
-<footer>Relatório gerado pelo app Inspeções de conformidade Técnica/NR-10 – Nord Consult em ${escapar(dataHora(Date.now()))}. As fotos e áudios estão nas pastas <code>fotos/</code> e <code>audios/</code> deste pacote.</footer>
+<footer>Relatório gerado pelo app Inspeções de conformidade Técnica/NR-10 – Nord Consult em ${escapar(dataHora(Date.now()))}. Fotos, áudios e descrições estão na pasta <code>NCs/</code> deste pacote (data → área → sub-área → NC).</footer>
 </body>
 </html>`;
 }
@@ -195,6 +230,8 @@ function gerarJSON(dados) {
     numero: nc.numero,
     descricao: nc.descricao,
     criadoEm: new Date(nc.criadoEm).toISOString(),
+    pasta: nc.pasta,
+    descricaoArquivo: nc.descricaoArquivo,
     fotos: nc.fotos.map((f) => f.arquivo),
     audios: nc.audios.map((a) => a.arquivo),
   });
@@ -241,6 +278,9 @@ export async function gerarZip(inspecaoId, aoProgredir) {
     for (const nc of todasNCs) {
       for (const foto of nc.fotos) zip.file(foto.arquivo, foto.blob, { compression: 'STORE' });
       for (const audio of nc.audios) zip.file(audio.arquivo, audio.blob, { compression: 'STORE' });
+      if (nc.descricaoArquivo) zip.file(nc.descricaoArquivo, nc.descricao);
+      // NC sem nenhum anexo: registra a pasta vazia mesmo assim.
+      if (!nc.fotos.length && !nc.audios.length && !nc.descricaoArquivo) zip.folder(nc.pasta);
     }
   }
 
