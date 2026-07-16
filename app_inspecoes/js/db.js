@@ -23,6 +23,11 @@ db.version(2).stores({
   respostas: '++id, inspecaoId, ncId, &[inspecaoId+itemId]',
 });
 
+// v3: itens de checklist adicionados pelo inspetor em campo.
+db.version(3).stores({
+  itensExtras: '++id, inspecaoId, &itemId',
+});
+
 // ---------- config ----------
 
 export async function obterConfig(chave) {
@@ -220,6 +225,35 @@ export async function responderNaoConforme(inspecaoId, itemId, itemTexto) {
   const ncId = await criarNC(inspecaoId, null, { itemId, itemTexto });
   await gravarResposta(inspecaoId, itemId, { status: 'nao_conforme', ncId });
   return ncId;
+}
+
+// ---------- itens extras (adicionados em campo) ----------
+
+export function listarItensExtras(inspecaoId) {
+  return db.itensExtras.where('inspecaoId').equals(inspecaoId).sortBy('criadoEm');
+}
+
+export function contarItensExtras(inspecaoId) {
+  return db.itensExtras.where('inspecaoId').equals(inspecaoId).count();
+}
+
+export async function criarItemExtra(inspecaoId, texto) {
+  const itemId = `extra-${inspecaoId}-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+  await db.itensExtras.add({ inspecaoId, itemId, texto: texto.trim(), criadoEm: Date.now() });
+  await tocarInspecao(inspecaoId);
+  return itemId;
+}
+
+/** Exclui o item extra, a resposta e a NC vinculada (se houver). */
+export async function excluirItemExtra(inspecaoId, itemId) {
+  const resposta = await db.respostas
+    .where('[inspecaoId+itemId]').equals([inspecaoId, itemId]).first();
+  if (resposta && resposta.ncId) await excluirNC(resposta.ncId);
+  await db.transaction('rw', db.itensExtras, db.respostas, async () => {
+    await db.itensExtras.where('itemId').equals(itemId).delete();
+    await db.respostas.where('[inspecaoId+itemId]').equals([inspecaoId, itemId]).delete();
+  });
+  await tocarInspecao(inspecaoId);
 }
 
 // ---------- fotos ----------

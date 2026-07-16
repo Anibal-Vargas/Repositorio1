@@ -104,7 +104,7 @@ export const CHECKLISTS = {
         ],
       },
       {
-        titulo: 'Geral (verificações finais)',
+        titulo: 'Geral (demais itens)',
         itens: [
           { id: 'sub-041', texto: 'No caso de ramal de saída subterrâneo a malha de aterramento do cabo está conectada à terra em uma das extremidades do cabo?' },
           { id: 'sub-042', texto: 'Tela de proteção interna possui malha nas dimensões adequadas? (máx 30x30mm)' },

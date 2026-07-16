@@ -153,6 +153,30 @@ export async function coletarDados(inspecaoId) {
       if (ncsDaSecao.length) arvore.push({ nome: secao.titulo, ncs: ncsDaSecao, subareas: [] });
     }
 
+    // Itens adicionais criados em campo pelo inspetor
+    const extras = await db.itensExtras.where('inspecaoId').equals(inspecaoId).sortBy('criadoEm');
+    if (extras.length) {
+      const caminho = 'Itens adicionais';
+      const ncsExtras = [];
+      const itens = [];
+      for (const extra of extras) {
+        const resposta = respostaPorItem.get(extra.itemId) || null;
+        const nc = resposta && resposta.ncId ? ncPorId.get(resposta.ncId) : null;
+        if (nc) {
+          vinculadas.add(nc.id);
+          ncsExtras.push(await montarNC(nc, caminho));
+        }
+        itens.push({
+          id: extra.itemId,
+          texto: extra.texto,
+          status: resposta ? resposta.status : null,
+          nc: nc ? nc.numero : null,
+        });
+      }
+      checklistResumo.push({ secao: 'Itens adicionais', itens });
+      if (ncsExtras.length) arvore.push({ nome: 'Itens adicionais', ncs: ncsExtras, subareas: [] });
+    }
+
     // NCs cujo item saiu do checklist (não deve acontecer, mas não se perde nada)
     const orfas = ncs.filter((nc) => !vinculadas.has(nc.id));
     if (orfas.length) {

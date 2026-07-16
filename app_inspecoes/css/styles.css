@@ -392,3 +392,16 @@ textarea { resize: vertical; min-height: 100px; }
 .sel-conforme { background: var(--verde); border-color: var(--verde); color: var(--branco); }
 .sel-nc { background: var(--vermelho); border-color: var(--vermelho); color: var(--branco); }
 .sel-na { background: var(--cinza); border-color: var(--cinza); color: var(--branco); }
+
+.linha-item-extra { display: flex; gap: 0.4rem; align-items: flex-start; }
+.linha-item-extra .texto-item { flex: 1; }
+.btn-excluir-extra {
+  min-width: 40px;
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.btn-excluir-extra:active { background: var(--laranja-suave); }
