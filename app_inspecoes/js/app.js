@@ -7,6 +7,7 @@ import { telaInspecao } from './screens/inspecao.js';
 import { telaNC } from './screens/nc.js';
 import { telaRetomar } from './screens/retomar.js';
 import { telaExportar } from './screens/exportar.js';
+import { telaPainel } from './screens/checklist.js';
 
 // Cada rota mapeia para uma função async tela(container, ...paramsCapturados).
 const ROTAS = [
@@ -16,6 +17,7 @@ const ROTAS = [
   { padrao: /^#\/exportar$/, tela: telaExportar },
   { padrao: /^#\/inspecao\/(\d+)$/, tela: telaInspecao },
   { padrao: /^#\/inspecao\/(\d+)\/area\/(\d+)$/, tela: telaInspecao },
+  { padrao: /^#\/inspecao\/(\d+)\/painel\/(\d+)$/, tela: telaPainel },
   { padrao: /^#\/nc\/(\d+)$/, tela: telaNC },
 ];
 

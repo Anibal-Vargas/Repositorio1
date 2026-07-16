@@ -405,3 +405,13 @@ textarea { resize: vertical; min-height: 100px; }
   border-radius: 8px;
 }
 .btn-excluir-extra:active { background: var(--laranja-suave); }
+
+/* Títulos de seção do checklist ganham faixa de destaque */
+h2.secao-checklist {
+  background: var(--laranja-suave);
+  color: var(--laranja-forte);
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border-left: 4px solid var(--laranja);
+  margin-top: 0.6rem;
+}

@@ -123,7 +123,83 @@ export async function coletarDados(inspecaoId) {
   let checklistResumo = null;
 
   const checklist = (inspecao.tipo || 'geral') !== 'geral' ? checklistDoTipo(inspecao.tipo) : null;
-  if (checklist) {
+  if (checklist && inspecao.tipo === 'paineis') {
+    // Painéis: hierarquia Área/[Sub-área]/Painel; um checklist por painel.
+    const [paineis, respostas, extras] = await Promise.all([
+      db.paineis.where('inspecaoId').equals(inspecaoId).sortBy('criadoEm'),
+      db.respostas.where('inspecaoId').equals(inspecaoId).toArray(),
+      db.itensExtras.where('inspecaoId').equals(inspecaoId).sortBy('criadoEm'),
+    ]);
+    const ncPorId = new Map(ncs.map((nc) => [nc.id, nc]));
+    const areaPorId = new Map(areas.map((a) => [a.id, a]));
+    const vinculadas = new Set();
+    checklistResumo = [];
+
+    const nomesDoPainel = (painel) => {
+      const area = areaPorId.get(painel.areaId);
+      const pai = area && (area.parentId ?? null) !== null ? areaPorId.get(area.parentId) : null;
+      return [pai && pai.nome, area && area.nome, painel.nome].filter(Boolean);
+    };
+
+    for (const painel of paineis) {
+      const nomes = nomesDoPainel(painel);
+      const rotulo = nomes.join(' › ');
+      const caminho = nomes.map(sanitizarPasta).join('/');
+      const respostaDoItem = (itemId) =>
+        respostas.find((r) => r.painelId === painel.id && r.itemId === itemId) || null;
+      const ncsDoPainel = [];
+
+      for (const secao of checklist.secoes) {
+        const itens = [];
+        for (const item of secao.itens) {
+          const resposta = respostaDoItem(item.id);
+          const nc = resposta && resposta.ncId ? ncPorId.get(resposta.ncId) : null;
+          if (nc) {
+            vinculadas.add(nc.id);
+            ncsDoPainel.push(await montarNC(nc, caminho));
+          }
+          itens.push({
+            id: item.id,
+            texto: item.texto,
+            status: resposta ? resposta.status : null,
+            nc: nc ? nc.numero : null,
+          });
+        }
+        checklistResumo.push({ secao: `${rotulo} — ${secao.titulo}`, itens });
+      }
+
+      const extrasDoPainel = extras.filter((e) => e.painelId === painel.id);
+      if (extrasDoPainel.length) {
+        const itens = [];
+        for (const extra of extrasDoPainel) {
+          const resposta = respostaDoItem(extra.itemId);
+          const nc = resposta && resposta.ncId ? ncPorId.get(resposta.ncId) : null;
+          if (nc) {
+            vinculadas.add(nc.id);
+            ncsDoPainel.push(await montarNC(nc, caminho));
+          }
+          itens.push({
+            id: extra.itemId,
+            texto: extra.texto,
+            status: resposta ? resposta.status : null,
+            nc: nc ? nc.numero : null,
+          });
+        }
+        checklistResumo.push({ secao: `${rotulo} — Itens adicionais`, itens });
+      }
+
+      if (ncsDoPainel.length) arvore.push({ nome: rotulo, ncs: ncsDoPainel, subareas: [] });
+    }
+
+    const orfas = ncs.filter((nc) => !vinculadas.has(nc.id));
+    if (orfas.length) {
+      arvore.push({
+        nome: 'Checklist',
+        ncs: await Promise.all(orfas.map((nc) => montarNC(nc, 'Checklist'))),
+        subareas: [],
+      });
+    }
+  } else if (checklist) {
     // Tipos com checklist: a "área" da pasta é a seção do checklist.
     const respostas = await db.respostas.where('inspecaoId').equals(inspecaoId).toArray();
     const respostaPorItem = new Map(respostas.map((r) => [r.itemId, r]));
@@ -229,7 +305,7 @@ function cartaoNC(nc) {
 const ROTULO_STATUS = {
   conforme: '✔ Conforme',
   nao_conforme: '✖ Não conforme',
-  nao_aplica: 'Ø Não se aplica',
+  nao_aplica: 'N.A. (não se aplica)',
 };
 
 function tabelaChecklist(checklistResumo) {

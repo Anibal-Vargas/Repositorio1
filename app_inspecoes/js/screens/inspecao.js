@@ -5,7 +5,9 @@
 import {
   db, obterInspecao, obterArea, listarAreas, criarArea,
   listarNCsDaArea, criarNC, adicionarFoto, contarFotos,
+  listarPaineis, criarPainel, obterRespostas, listarItensExtras,
 } from '../db.js';
+import { totalItens } from '../checklists.js';
 import { capturarFoto } from '../camera.js';
 import { telaChecklist } from './checklist.js';
 import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
@@ -21,8 +23,11 @@ export async function telaInspecao(inspecaoId, areaId = null) {
   const inspecao = await obterInspecao(inspecaoId);
   if (!inspecao) { location.hash = '#/home'; return el('div'); }
 
-  // Tipos com checklist (Subestações, Painéis, Documental) têm tela própria.
-  if ((inspecao.tipo || 'geral') !== 'geral') return telaChecklist(inspecao);
+  // Subestações/Documental: um checklist por inspeção, tela própria.
+  // Painéis usa a navegação de áreas daqui, com painéis dentro delas.
+  const tipo = inspecao.tipo || 'geral';
+  if (tipo !== 'geral' && tipo !== 'paineis') return telaChecklist(inspecao);
+  const ehPaineis = tipo === 'paineis';
 
   const [cliente, area] = await Promise.all([
     db.clientes.get(inspecao.clienteId),
@@ -67,7 +72,10 @@ export async function telaInspecao(inspecaoId, areaId = null) {
       ));
     } else {
       conteudo.append(el('p', { class: 'vazio' },
-        area ? 'Nenhuma sub-área ainda.' : 'Crie a primeira área para começar (ex.: Produção, Almoxarifado).'));
+        area ? 'Nenhuma sub-área ainda.'
+          : ehPaineis
+            ? 'Crie a primeira área para começar (ex.: Produção). Os painéis ficam dentro das áreas.'
+            : 'Crie a primeira área para começar (ex.: Produção, Almoxarifado).'));
     }
 
     const campoArea = el('input', { type: 'text', placeholder: area ? 'Nova sub-área' : 'Nova área' });
@@ -85,8 +93,60 @@ export async function telaInspecao(inspecaoId, areaId = null) {
     ));
   }
 
-  // ---- NCs: só dentro de área ou sub-área ----
-  if (area) {
+  // ---- Painéis (tipo Painéis): dentro de área ou sub-área ----
+  if (area && ehPaineis) {
+    conteudo.append(el('h2', {}, 'Painéis'));
+
+    const paineis = await listarPaineis(inspecaoId, areaId);
+    if (paineis.length) {
+      const [respostas, extras, ncsTodas] = await Promise.all([
+        obterRespostas(inspecaoId),
+        listarItensExtras(inspecaoId),
+        db.ncs.where('inspecaoId').equals(inspecaoId).toArray(),
+      ]);
+      conteudo.append(el('div', { class: 'lista' },
+        paineis.map((painel) => {
+          const doPainel = respostas.filter((r) => r.painelId === painel.id);
+          const verificados = doPainel.filter((r) => r.status).length;
+          const total = totalItens('paineis') +
+            extras.filter((e) => e.painelId === painel.id).length;
+          const ncsDoPainel = ncsTodas.filter((nc) => nc.painelId === painel.id).length;
+          return el('button', {
+            class: 'cartao',
+            onclick: () => { location.hash = `#/inspecao/${inspecaoId}/painel/${painel.id}`; },
+          },
+            el('span', { 'aria-hidden': 'true', style: 'font-size:1.3rem' }, '🎛️'),
+            el('span', { class: 'principal' },
+              el('span', { class: 'titulo' }, painel.nome),
+              el('span', { class: 'detalhe' },
+                `✅ ${verificados} de ${total} itens` +
+                (ncsDoPainel ? ` · ⚠️ ${ncsDoPainel} NC` : '')),
+            ),
+            el('span', { class: 'seta', 'aria-hidden': 'true' }, '›'),
+          );
+        }),
+      ));
+    } else {
+      conteudo.append(el('p', { class: 'vazio' }, 'Nenhum painel cadastrado aqui.'));
+    }
+
+    const campoPainel = el('input', { type: 'text', placeholder: 'Nome do painel (ex.: QGBT-01)' });
+    const adicionarPainel = async () => {
+      const nome = campoPainel.value.trim();
+      if (!nome) { campoPainel.focus(); return; }
+      await criarPainel(inspecaoId, areaId, nome);
+      toast(`Painel "${nome}" criado.`);
+      recarregar();
+    };
+    campoPainel.addEventListener('keydown', (evento) => { if (evento.key === 'Enter') adicionarPainel(); });
+    conteudo.append(el('div', { class: 'linha-form' },
+      campoPainel,
+      el('button', { class: 'btn btn-primario', onclick: adicionarPainel }, '+ Criar'),
+    ));
+  }
+
+  // ---- NCs: só dentro de área ou sub-área (inspeção Geral) ----
+  if (area && !ehPaineis) {
     conteudo.append(el('h2', {}, 'Não conformidades'));
 
     const ncs = await listarNCsDaArea(areaId);

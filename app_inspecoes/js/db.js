@@ -28,6 +28,21 @@ db.version(3).stores({
   itensExtras: '++id, inspecaoId, &itemId',
 });
 
+// v4: inspeção de Painéis — cada painel (dentro de área/sub-área) tem o
+// próprio checklist. Respostas e itens extras ganham painelId
+// (0 = inspeção sem painéis, ex.: Subestações).
+db.version(4).stores({
+  paineis: '++id, inspecaoId, areaId',
+  respostas: '++id, inspecaoId, ncId, &[inspecaoId+painelId+itemId]',
+}).upgrade((tx) => Promise.all([
+  tx.table('respostas').toCollection().modify((r) => {
+    if (r.painelId === undefined) r.painelId = 0;
+  }),
+  tx.table('itensExtras').toCollection().modify((e) => {
+    if (e.painelId === undefined) e.painelId = 0;
+  }),
+]));
+
 // ---------- config ----------
 
 export async function obterConfig(chave) {
@@ -155,6 +170,7 @@ export async function criarNC(inspecaoId, areaId, extras = {}) {
       // não mudar se o checklist for atualizado depois).
       itemId: extras.itemId ?? null,
       itemTexto: extras.itemTexto ?? null,
+      painelId: extras.painelId ?? null,
       numero: `NC-${String(numero).padStart(3, '0')}`,
       descricao: '',
       criadoEm: Date.now(),
@@ -195,35 +211,60 @@ export async function excluirNC(id) {
   if (nc) await tocarInspecao(nc.inspecaoId);
 }
 
+// ---------- painéis (inspeção de Painéis) ----------
+
+export async function criarPainel(inspecaoId, areaId, nome) {
+  const id = await db.paineis.add({
+    inspecaoId, areaId, nome: nome.trim(), criadoEm: Date.now(),
+  });
+  await tocarInspecao(inspecaoId);
+  return id;
+}
+
+export function obterPainel(id) {
+  return db.paineis.get(id);
+}
+
+export function listarPaineis(inspecaoId, areaId) {
+  return db.paineis.where('inspecaoId').equals(inspecaoId)
+    .filter((p) => p.areaId === areaId).sortBy('criadoEm');
+}
+
+export function contarPaineis(inspecaoId) {
+  return db.paineis.where('inspecaoId').equals(inspecaoId).count();
+}
+
 // ---------- respostas de checklist ----------
 
 export function obterRespostas(inspecaoId) {
   return db.respostas.where('inspecaoId').equals(inspecaoId).toArray();
 }
 
-async function gravarResposta(inspecaoId, itemId, campos) {
+async function gravarResposta(inspecaoId, painelId, itemId, campos) {
   const existente = await db.respostas
-    .where('[inspecaoId+itemId]').equals([inspecaoId, itemId]).first();
+    .where('[inspecaoId+painelId+itemId]').equals([inspecaoId, painelId, itemId]).first();
   if (existente) {
     await db.respostas.update(existente.id, { ...campos, atualizadoEm: Date.now() });
   } else {
     await db.respostas.add({
-      inspecaoId, itemId, ncId: null, status: null,
+      inspecaoId, painelId, itemId, ncId: null, status: null,
       ...campos, atualizadoEm: Date.now(),
     });
   }
   await tocarInspecao(inspecaoId);
 }
 
-/** Marca conforme / não se aplica / null (limpa). */
-export function definirResposta(inspecaoId, itemId, status) {
-  return gravarResposta(inspecaoId, itemId, { status });
+/** Marca conforme / não se aplica / null (limpa). painelId 0 = sem painel. */
+export function definirResposta(inspecaoId, painelId, itemId, status) {
+  return gravarResposta(inspecaoId, painelId, itemId, { status });
 }
 
 /** Marca não conforme: cria a NC vinculada e retorna o id dela. */
-export async function responderNaoConforme(inspecaoId, itemId, itemTexto) {
-  const ncId = await criarNC(inspecaoId, null, { itemId, itemTexto });
-  await gravarResposta(inspecaoId, itemId, { status: 'nao_conforme', ncId });
+export async function responderNaoConforme(inspecaoId, painelId, itemId, itemTexto) {
+  const ncId = await criarNC(inspecaoId, null, {
+    itemId, itemTexto, painelId: painelId || null,
+  });
+  await gravarResposta(inspecaoId, painelId, itemId, { status: 'nao_conforme', ncId });
   return ncId;
 }
 
@@ -237,9 +278,11 @@ export function contarItensExtras(inspecaoId) {
   return db.itensExtras.where('inspecaoId').equals(inspecaoId).count();
 }
 
-export async function criarItemExtra(inspecaoId, texto) {
+export async function criarItemExtra(inspecaoId, painelId, texto) {
   const itemId = `extra-${inspecaoId}-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
-  await db.itensExtras.add({ inspecaoId, itemId, texto: texto.trim(), criadoEm: Date.now() });
+  await db.itensExtras.add({
+    inspecaoId, painelId, itemId, texto: texto.trim(), criadoEm: Date.now(),
+  });
   await tocarInspecao(inspecaoId);
   return itemId;
 }
@@ -247,11 +290,13 @@ export async function criarItemExtra(inspecaoId, texto) {
 /** Exclui o item extra, a resposta e a NC vinculada (se houver). */
 export async function excluirItemExtra(inspecaoId, itemId) {
   const resposta = await db.respostas
-    .where('[inspecaoId+itemId]').equals([inspecaoId, itemId]).first();
+    .where('inspecaoId').equals(inspecaoId)
+    .filter((r) => r.itemId === itemId).first();
   if (resposta && resposta.ncId) await excluirNC(resposta.ncId);
   await db.transaction('rw', db.itensExtras, db.respostas, async () => {
     await db.itensExtras.where('itemId').equals(itemId).delete();
-    await db.respostas.where('[inspecaoId+itemId]').equals([inspecaoId, itemId]).delete();
+    await db.respostas.where('inspecaoId').equals(inspecaoId)
+      .filter((r) => r.itemId === itemId).delete();
   });
   await tocarInspecao(inspecaoId);
 }

@@ -14,9 +14,11 @@ export async function telaNC(ncId) {
   if (!nc) { location.hash = '#/home'; return el('div'); }
   const deChecklist = nc.areaId === null || nc.areaId === undefined;
   const area = deChecklist ? null : await obterArea(nc.areaId);
-  const voltarPara = deChecklist
-    ? `#/inspecao/${nc.inspecaoId}`
-    : `#/inspecao/${nc.inspecaoId}/area/${nc.areaId}`;
+  const voltarPara = nc.painelId
+    ? `#/inspecao/${nc.inspecaoId}/painel/${nc.painelId}`
+    : deChecklist
+      ? `#/inspecao/${nc.inspecaoId}`
+      : `#/inspecao/${nc.inspecaoId}/area/${nc.areaId}`;
 
   const conteudo = el('main', { class: 'conteudo' });
 

@@ -124,7 +124,31 @@ export const CHECKLISTS = {
   },
   paineis: {
     rotulo: 'Painéis',
-    secoes: [],
+    // Checklist oficial Nord Consult (documento 'Check-list painéis
+    // elétricos'), importado em 2026-07-16. Aplicado POR PAINEL.
+    secoes: [
+      {
+        titulo: 'Verificações do painel',
+        itens: [
+          { id: 'pan-001', texto: 'Painel possui nomenclatura?' },
+          { id: 'pan-002', texto: 'Painel possui sinalização de perigo?' },
+          { id: 'pan-003', texto: 'Painel possui sinalização de restrição de acesso?' },
+          { id: 'pan-004', texto: 'Painel possui sistema de bloqueio para impedimento de reenergização?' },
+          { id: 'pan-005', texto: 'Painel possui aterramento e está com carcaça e portas aterradas?' },
+          { id: 'pan-006', texto: 'Painel possui diagrama unifilar?' },
+          { id: 'pan-007', texto: 'Painel não apresenta partes vivas expostas?' },
+          { id: 'pan-008', texto: 'Painel possui DR?' },
+          { id: 'pan-009', texto: 'DR é compatível com o disjuntor a montante?' },
+          { id: 'pan-010', texto: 'Painel possui um disjuntor geral?' },
+          { id: 'pan-011', texto: 'Painel está limpo e organizado?' },
+          { id: 'pan-012', texto: 'Sistema de iluminação existe e está operando?' },
+          { id: 'pan-013', texto: 'Sistema de ventilação forçada existe e está operando ou com condições de operação?' },
+          { id: 'pan-014', texto: 'Componentes internos estão identificados?' },
+          { id: 'pan-015', texto: 'Iluminação da sala de painéis é adequada?' },
+          { id: 'pan-016', texto: 'Ergonomia e espaço de trabalho junto ao painel é adequada?' },
+        ],
+      },
+    ],
   },
   documental: {
     rotulo: 'Documental',
