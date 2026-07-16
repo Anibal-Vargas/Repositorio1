@@ -11,7 +11,7 @@ recriação vetorial aproximada — para usar a arte oficial, substitua esse
 arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
 `VERSAO` em `sw.js`.
 
-## Estado atual (Fases 1, 2 e 3 concluídas)
+## Estado atual (Fases 1–4; checklists aguardando as listas oficiais)
 
 - **PWA instalável**: `manifest.json`, Service Worker com pré-cache de todos os
   assets e atualização automática (incremente `VERSAO` em `sw.js` ao publicar).
@@ -19,8 +19,13 @@ arquivo pelo PNG original (mesmo nome, fundo transparente) e incremente
   armazenamento usado.
 - **Nova inspeção** em tela única: inspetor (lista suspensa com a equipe
   Nord Consult + opção de digitar outro nome), cliente (lista suspensa +
-  cadastro) e tipo (Geral funcional; Subestações, Painéis e Documental
-  chegam na Fase 4). O inspetor escolhido vem pré-selecionado na próxima.
+  cadastro) e tipo. O inspetor escolhido vem pré-selecionado na próxima.
+- **Checklists (Fase 4)**: Subestações, Painéis e Documental usam checklist
+  com itens Conforme / Não conforme / Não se aplica; "Não conforme" cria uma
+  NC vinculada (fotos/áudio/descrição) e a exportação agrupa por seção do
+  checklist, com resumo no relatório e no dados.json. Os itens ficam em
+  `js/checklists.js` — enquanto um tipo estiver com as seções vazias, ele
+  aparece como "Aguardando checklist".
 - **Inspeção Geral**: áreas e sub-áreas (1 nível), NCs com numeração
   sequencial (NC-001, NC-002…), até 20 fotos por NC (câmera nativa via
   `input capture`, compressão Canvas para máx. 1920px / JPEG 0.8), descrição
@@ -81,9 +86,9 @@ app_inspecoes/
 Edite os arquivos e **incremente `VERSAO` em `sw.js`**. Na próxima abertura
 com rede, o app baixa a versão nova e recarrega sozinho.
 
-## Pendente (Fases 4–5)
+## Pendente
 
-- **Fase 4 — Demais tipos**: Subestações, Painéis e Documental (checklists
-  específicos).
+- **Fase 4 (conteúdo)**: preencher `js/checklists.js` com as listas oficiais
+  de Subestações, Painéis e Documental.
 - **Fase 5 — Refinamentos**: edição/exclusão de áreas e clientes, busca,
   relatório formatado, importação em outro dispositivo.

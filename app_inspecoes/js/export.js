@@ -8,6 +8,7 @@
 // JSZip é carregado como script global em index.html.
 
 import { db } from './db.js';
+import { checklistDoTipo } from './checklists.js';
 
 const ROTULO_TIPO = {
   geral: 'Geral',
@@ -97,6 +98,8 @@ export async function coletarDados(inspecaoId) {
       numero: nc.numero,
       descricao: nc.descricao || '',
       criadoEm: nc.criadoEm,
+      itemId: nc.itemId ?? null,
+      itemTexto: nc.itemTexto ?? null,
       pasta,
       descricaoArquivo: nc.descricao
         ? `${pasta}/${nc.numero}_desc01.txt`
@@ -117,19 +120,63 @@ export async function coletarDados(inspecaoId) {
     Promise.all(ncs.filter((nc) => nc.areaId === areaId).map((nc) => montarNC(nc, caminhoArea)));
 
   const arvore = [];
-  for (const area of areas.filter((a) => (a.parentId ?? null) === null)) {
-    const pastaArea = sanitizarPasta(area.nome);
-    const subareas = [];
-    for (const sub of areas.filter((a) => a.parentId === area.id)) {
-      subareas.push({
-        nome: sub.nome,
-        ncs: await ncsDaArea(sub.id, `${pastaArea}/${sanitizarPasta(sub.nome)}`),
+  let checklistResumo = null;
+
+  const checklist = (inspecao.tipo || 'geral') !== 'geral' ? checklistDoTipo(inspecao.tipo) : null;
+  if (checklist) {
+    // Tipos com checklist: a "área" da pasta é a seção do checklist.
+    const respostas = await db.respostas.where('inspecaoId').equals(inspecaoId).toArray();
+    const respostaPorItem = new Map(respostas.map((r) => [r.itemId, r]));
+    const ncPorId = new Map(ncs.map((nc) => [nc.id, nc]));
+    const vinculadas = new Set();
+
+    checklistResumo = [];
+    for (const secao of checklist.secoes) {
+      const caminho = sanitizarPasta(secao.titulo);
+      const ncsDaSecao = [];
+      const itens = [];
+      for (const item of secao.itens) {
+        const resposta = respostaPorItem.get(item.id) || null;
+        const nc = resposta && resposta.ncId ? ncPorId.get(resposta.ncId) : null;
+        if (nc) {
+          vinculadas.add(nc.id);
+          ncsDaSecao.push(await montarNC(nc, caminho));
+        }
+        itens.push({
+          id: item.id,
+          texto: item.texto,
+          status: resposta ? resposta.status : null,
+          nc: nc ? nc.numero : null,
+        });
+      }
+      checklistResumo.push({ secao: secao.titulo, itens });
+      if (ncsDaSecao.length) arvore.push({ nome: secao.titulo, ncs: ncsDaSecao, subareas: [] });
+    }
+
+    // NCs cujo item saiu do checklist (não deve acontecer, mas não se perde nada)
+    const orfas = ncs.filter((nc) => !vinculadas.has(nc.id));
+    if (orfas.length) {
+      arvore.push({
+        nome: 'Checklist',
+        ncs: await Promise.all(orfas.map((nc) => montarNC(nc, 'Checklist'))),
+        subareas: [],
       });
     }
-    arvore.push({ nome: area.nome, ncs: await ncsDaArea(area.id, pastaArea), subareas });
+  } else {
+    for (const area of areas.filter((a) => (a.parentId ?? null) === null)) {
+      const pastaArea = sanitizarPasta(area.nome);
+      const subareas = [];
+      for (const sub of areas.filter((a) => a.parentId === area.id)) {
+        subareas.push({
+          nome: sub.nome,
+          ncs: await ncsDaArea(sub.id, `${pastaArea}/${sanitizarPasta(sub.nome)}`),
+        });
+      }
+      arvore.push({ nome: area.nome, ncs: await ncsDaArea(area.id, pastaArea), subareas });
+    }
   }
 
-  return { inspecao, cliente, arvore, totais };
+  return { inspecao, cliente, arvore, totais, checklistResumo };
 }
 
 // ---------- relatório HTML ----------
@@ -149,13 +196,36 @@ function cartaoNC(nc) {
   return `<article class="nc">
     <header><span class="selo">${escapar(nc.numero)}</span>
     <span class="quando">${escapar(dataHora(nc.criadoEm))}</span></header>
+    ${nc.itemTexto ? `<p class="item-ref">Item verificado: ${escapar(nc.itemTexto)}</p>` : ''}
     <p class="descricao">${nc.descricao ? escapar(nc.descricao) : '<em>Sem descrição.</em>'}</p>
     ${fotos}${audios}
   </article>`;
 }
 
+const ROTULO_STATUS = {
+  conforme: '✔ Conforme',
+  nao_conforme: '✖ Não conforme',
+  nao_aplica: 'Ø Não se aplica',
+};
+
+function tabelaChecklist(checklistResumo) {
+  if (!checklistResumo) return '';
+  const linhas = checklistResumo.map((secao) => `
+    <tr class="secao"><td colspan="2">${escapar(secao.secao)}</td></tr>
+    ${secao.itens.map((item) => `
+      <tr>
+        <td>${escapar(item.texto)}</td>
+        <td class="st st-${item.status || 'nv'}">${item.status ? escapar(ROTULO_STATUS[item.status] || item.status) : '— Não verificado'}${item.nc ? ` (${escapar(item.nc)})` : ''}</td>
+      </tr>`).join('')}
+  `).join('');
+  return `<section>
+    <h2>📋 Resumo do checklist</h2>
+    <table class="checklist"><tbody>${linhas}</tbody></table>
+  </section>`;
+}
+
 function gerarRelatorioHTML(dados) {
-  const { inspecao, cliente, arvore, totais } = dados;
+  const { inspecao, cliente, arvore, totais, checklistResumo } = dados;
   const titulo = `Inspeção ${ROTULO_TIPO[inspecao.tipo] || inspecao.tipo} — ${cliente ? cliente.nome : 'Cliente'}`;
 
   const secoes = arvore.map((area) => `
@@ -195,6 +265,14 @@ function gerarRelatorioHTML(dados) {
   .fotos img { width: 100%; height: 150px; object-fit: cover; border-radius: 6px; border: 1px solid var(--borda); }
   .audios { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.9rem; }
   .vazio { color: var(--cinza); font-style: italic; }
+  .item-ref { margin: 0.4rem 0 0; color: var(--laranja-forte); font-size: 0.9rem; font-weight: 600; }
+  table.checklist { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  table.checklist td { border: 1px solid var(--borda); padding: 0.4rem 0.6rem; vertical-align: top; }
+  table.checklist tr.secao td { background: #f4f6fa; font-weight: 700; color: var(--laranja-forte); }
+  table.checklist td.st { white-space: nowrap; }
+  table.checklist td.st-conforme { color: #2e7d32; font-weight: 600; }
+  table.checklist td.st-nao_conforme { color: var(--vermelho); font-weight: 700; }
+  table.checklist td.st-nao_aplica, table.checklist td.st-nv { color: var(--cinza); }
   footer { margin-top: 2.5rem; color: var(--cinza); font-size: 0.85rem; border-top: 1px solid var(--borda); padding-top: 0.75rem; }
   @media print { .fotos img { height: 120px; } }
 </style>
@@ -216,7 +294,8 @@ function gerarRelatorioHTML(dados) {
     <span>🎙️ <strong>${totais.audios}</strong> áudio(s)</span>
   </div>
 </header>
-${secoes || '<p class="vazio">Nenhuma área registrada.</p>'}
+${tabelaChecklist(checklistResumo)}
+${secoes || (checklistResumo ? '' : '<p class="vazio">Nenhuma área registrada.</p>')}
 <footer>Relatório gerado pelo app Inspeções de conformidade Técnica/NR-10 – Nord Consult em ${escapar(dataHora(Date.now()))}. Fotos, áudios e descrições estão na pasta <code>NCs/</code> deste pacote (data → área → sub-área → NC).</footer>
 </body>
 </html>`;
@@ -225,11 +304,13 @@ ${secoes || '<p class="vazio">Nenhuma área registrada.</p>'}
 // ---------- dados.json ----------
 
 function gerarJSON(dados) {
-  const { inspecao, cliente, arvore, totais } = dados;
+  const { inspecao, cliente, arvore, totais, checklistResumo } = dados;
   const limparNC = (nc) => ({
     numero: nc.numero,
     descricao: nc.descricao,
     criadoEm: new Date(nc.criadoEm).toISOString(),
+    itemId: nc.itemId,
+    itemTexto: nc.itemTexto,
     pasta: nc.pasta,
     descricaoArquivo: nc.descricaoArquivo,
     fotos: nc.fotos.map((f) => f.arquivo),
@@ -248,6 +329,7 @@ function gerarJSON(dados) {
     },
     cliente: { nome: cliente ? cliente.nome : '' },
     totais,
+    checklist: checklistResumo,
     areas: arvore.map((area) => ({
       nome: area.nome,
       ncs: area.ncs.map(limparNC),

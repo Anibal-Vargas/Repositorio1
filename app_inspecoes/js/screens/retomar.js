@@ -1,6 +1,7 @@
 // Retomar inspeção — lista as inspeções abertas com progresso.
 
-import { db, listarInspecoesAbertas, progressoInspecao } from '../db.js';
+import { db, listarInspecoesAbertas, progressoInspecao, obterRespostas } from '../db.js';
+import { tipoTemChecklist, totalItens } from '../checklists.js';
 import { el, cabecalho, formatarDataHora } from '../ui.js';
 
 const ROTULO_TIPO = {
@@ -18,6 +19,18 @@ export async function telaRetomar() {
       db.clientes.get(inspecao.clienteId),
       progressoInspecao(inspecao.id),
     ]);
+    let linhaProgresso =
+      `📍 ${progresso.areas} área${progresso.areas === 1 ? '' : 's'} · ` +
+      `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
+      `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
+    if (tipoTemChecklist(inspecao.tipo)) {
+      const respostas = await obterRespostas(inspecao.id);
+      const verificados = respostas.filter((r) => r.status).length;
+      linhaProgresso =
+        `✅ ${verificados} de ${totalItens(inspecao.tipo)} itens · ` +
+        `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
+        `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
+    }
     return el('button', {
       class: 'cartao',
       onclick: () => { location.hash = `#/inspecao/${inspecao.id}`; },
@@ -26,10 +39,7 @@ export async function telaRetomar() {
         el('span', { class: 'titulo' }, cliente ? cliente.nome : 'Cliente removido'),
         el('span', { class: 'detalhe' },
           `${ROTULO_TIPO[inspecao.tipo] || inspecao.tipo} · iniciada em ${formatarDataHora(inspecao.criadoEm)}`),
-        el('span', { class: 'detalhe' },
-          `📍 ${progresso.areas} área${progresso.areas === 1 ? '' : 's'} · ` +
-          `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
-          `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`),
+        el('span', { class: 'detalhe' }, linhaProgresso),
         el('span', { class: 'detalhe' },
           `Última atividade: ${formatarDataHora(inspecao.atualizadoEm)}`),
       ),

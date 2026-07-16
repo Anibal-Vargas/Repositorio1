@@ -7,6 +7,7 @@ import {
   listarNCsDaArea, criarNC, adicionarFoto, contarFotos,
 } from '../db.js';
 import { capturarFoto } from '../camera.js';
+import { telaChecklist } from './checklist.js';
 import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
 
 const ROTULO_TIPO = {
@@ -19,6 +20,9 @@ const ROTULO_TIPO = {
 export async function telaInspecao(inspecaoId, areaId = null) {
   const inspecao = await obterInspecao(inspecaoId);
   if (!inspecao) { location.hash = '#/home'; return el('div'); }
+
+  // Tipos com checklist (Subestações, Painéis, Documental) têm tela própria.
+  if ((inspecao.tipo || 'geral') !== 'geral') return telaChecklist(inspecao);
 
   const [cliente, area] = await Promise.all([
     db.clientes.get(inspecao.clienteId),

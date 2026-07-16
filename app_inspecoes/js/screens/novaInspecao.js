@@ -5,6 +5,7 @@ import {
   listarClientes, criarCliente, criarInspecao, obterInspetor, salvarInspetor,
 } from '../db.js';
 import { el, cabecalho, toast } from '../ui.js';
+import { tipoTemChecklist } from '../checklists.js';
 
 const INSPETORES = [
   'Adauto Muller',
@@ -17,11 +18,12 @@ const INSPETORES = [
 const OUTRO = '__outro__';
 const NOVO_CLIENTE = '__novo__';
 
+// Tipos com checklist ativam sozinhos quando js/checklists.js for preenchido.
 const TIPOS = [
   { codigo: 'geral', rotulo: 'Geral', icone: '🏭', ativo: true },
-  { codigo: 'subestacoes', rotulo: 'Subestações', icone: '⚡', ativo: false },
-  { codigo: 'paineis', rotulo: 'Painéis', icone: '🎛️', ativo: false },
-  { codigo: 'documental', rotulo: 'Documental', icone: '📄', ativo: false },
+  { codigo: 'subestacoes', rotulo: 'Subestações', icone: '⚡', ativo: tipoTemChecklist('subestacoes') },
+  { codigo: 'paineis', rotulo: 'Painéis', icone: '🎛️', ativo: tipoTemChecklist('paineis') },
+  { codigo: 'documental', rotulo: 'Documental', icone: '📄', ativo: tipoTemChecklist('documental') },
 ];
 
 export async function telaNovaInspecao() {
@@ -126,7 +128,7 @@ export async function telaNovaInspecao() {
             el('span', { class: 'titulo' }, tipo.rotulo),
             tipo.ativo
               ? el('span', { class: 'detalhe' }, 'Toque para iniciar')
-              : el('span', { class: 'detalhe' }, 'Em breve (Fase 4)'),
+              : el('span', { class: 'detalhe' }, 'Aguardando checklist'),
           ),
           tipo.ativo ? el('span', { class: 'seta', 'aria-hidden': 'true' }, '›') : null,
         )),

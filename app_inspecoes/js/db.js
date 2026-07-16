@@ -17,6 +17,12 @@ db.version(1).stores({
   audios: '++id, ncId, inspecaoId',
 });
 
+// v2 (Fase 4): respostas de checklist — uma por item por inspeção.
+// status: 'conforme' | 'nao_conforme' | 'nao_aplica' | null (não verificado)
+db.version(2).stores({
+  respostas: '++id, inspecaoId, ncId, &[inspecaoId+itemId]',
+});
+
 // ---------- config ----------
 
 export async function obterConfig(chave) {
@@ -131,7 +137,7 @@ export async function listarAreas(inspecaoId, parentId = null) {
  * Cria uma NC com numeração sequencial por inspeção (NC-001, NC-002…).
  * Transação garante que dois toques rápidos não repitam número.
  */
-export async function criarNC(inspecaoId, areaId) {
+export async function criarNC(inspecaoId, areaId, extras = {}) {
   return db.transaction('rw', db.inspecoes, db.ncs, async () => {
     const inspecao = await db.inspecoes.get(inspecaoId);
     const numero = (inspecao.contadorNC || 0) + 1;
@@ -139,6 +145,11 @@ export async function criarNC(inspecaoId, areaId) {
     const id = await db.ncs.add({
       inspecaoId,
       areaId,
+      // NCs de checklist: areaId === null e o item fica registrado aqui
+      // (itemTexto é cópia do texto na hora do registro, para o relatório
+      // não mudar se o checklist for atualizado depois).
+      itemId: extras.itemId ?? null,
+      itemTexto: extras.itemTexto ?? null,
       numero: `NC-${String(numero).padStart(3, '0')}`,
       descricao: '',
       criadoEm: Date.now(),
@@ -169,12 +180,46 @@ export async function atualizarDescricaoNC(id, descricao) {
 /** Exclui a NC e tudo que pertence a ela (fotos e áudios). */
 export async function excluirNC(id) {
   const nc = await db.ncs.get(id);
-  await db.transaction('rw', db.ncs, db.fotos, db.audios, async () => {
+  await db.transaction('rw', db.ncs, db.fotos, db.audios, db.respostas, async () => {
     await db.fotos.where('ncId').equals(id).delete();
     await db.audios.where('ncId').equals(id).delete();
+    // Item de checklist vinculado volta para "não verificado".
+    await db.respostas.where('ncId').equals(id).modify({ ncId: null, status: null });
     await db.ncs.delete(id);
   });
   if (nc) await tocarInspecao(nc.inspecaoId);
+}
+
+// ---------- respostas de checklist ----------
+
+export function obterRespostas(inspecaoId) {
+  return db.respostas.where('inspecaoId').equals(inspecaoId).toArray();
+}
+
+async function gravarResposta(inspecaoId, itemId, campos) {
+  const existente = await db.respostas
+    .where('[inspecaoId+itemId]').equals([inspecaoId, itemId]).first();
+  if (existente) {
+    await db.respostas.update(existente.id, { ...campos, atualizadoEm: Date.now() });
+  } else {
+    await db.respostas.add({
+      inspecaoId, itemId, ncId: null, status: null,
+      ...campos, atualizadoEm: Date.now(),
+    });
+  }
+  await tocarInspecao(inspecaoId);
+}
+
+/** Marca conforme / não se aplica / null (limpa). */
+export function definirResposta(inspecaoId, itemId, status) {
+  return gravarResposta(inspecaoId, itemId, { status });
+}
+
+/** Marca não conforme: cria a NC vinculada e retorna o id dela. */
+export async function responderNaoConforme(inspecaoId, itemId, itemTexto) {
+  const ncId = await criarNC(inspecaoId, null, { itemId, itemTexto });
+  await gravarResposta(inspecaoId, itemId, { status: 'nao_conforme', ncId });
+  return ncId;
 }
 
 // ---------- fotos ----------

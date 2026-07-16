@@ -12,8 +12,11 @@ import { el, cabecalho, toast, debounce, formatarDataHora } from '../ui.js';
 export async function telaNC(ncId) {
   const nc = await obterNC(ncId);
   if (!nc) { location.hash = '#/home'; return el('div'); }
-  const area = await obterArea(nc.areaId);
-  const voltarPara = `#/inspecao/${nc.inspecaoId}/area/${nc.areaId}`;
+  const deChecklist = nc.areaId === null || nc.areaId === undefined;
+  const area = deChecklist ? null : await obterArea(nc.areaId);
+  const voltarPara = deChecklist
+    ? `#/inspecao/${nc.inspecaoId}`
+    : `#/inspecao/${nc.inspecaoId}/area/${nc.areaId}`;
 
   const conteudo = el('main', { class: 'conteudo' });
 
@@ -154,7 +157,8 @@ export async function telaNC(ncId) {
       `Criada em ${formatarDataHora(nc.criadoEm)} · salvamento automático ativo`),
   );
 
-  return [cabecalho(nc.numero, voltarPara, area ? area.nome : ''), conteudo];
+  const subtitulo = deChecklist ? (nc.itemTexto || 'Item de checklist') : (area ? area.nome : '');
+  return [cabecalho(nc.numero, voltarPara, subtitulo), conteudo];
 }
 
 /** Visualização em tela cheia com opção de excluir a foto. */

@@ -357,3 +357,38 @@ textarea { resize: vertical; min-height: 100px; }
 .cartao-coluna { flex-direction: column; align-items: stretch; cursor: default; }
 .acoes-linha { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 .acoes-linha .btn { min-height: 44px; font-size: 0.92rem; padding: 0.4rem 0.5rem; }
+
+/* ---------- Checklist (Fase 4) ---------- */
+.progresso-checklist {
+  text-align: center;
+  color: var(--cinza);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+}
+.item-checklist {
+  background: var(--branco);
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 0.6rem 0.7rem;
+  box-shadow: var(--sombra);
+}
+.texto-item { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.opcoes-item { display: flex; gap: 0.4rem; }
+.btn-opcao {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1.5px solid var(--borda);
+  background: var(--branco);
+  color: var(--grafite);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.3rem 0.2rem;
+  touch-action: manipulation;
+}
+.btn-opcao:active { filter: brightness(0.94); }
+.sel-conforme { background: var(--verde); border-color: var(--verde); color: var(--branco); }
+.sel-nc { background: var(--vermelho); border-color: var(--vermelho); color: var(--branco); }
+.sel-na { background: var(--cinza); border-color: var(--cinza); color: var(--branco); }
