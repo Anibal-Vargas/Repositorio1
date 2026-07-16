@@ -1,7 +1,7 @@
 // Service Worker — cache offline-first de todos os assets do app.
 // Para publicar uma atualização, incremente VERSAO: o SW novo instala,
 // assume imediatamente (skipWaiting) e a página recarrega sozinha.
-const VERSAO = 'v1.5.0';
+const VERSAO = 'v1.5.1';
 const CACHE = `inspecoes-${VERSAO}`;
 
 const ASSETS = [
@@ -15,6 +15,7 @@ const ASSETS = [
   './js/db.js',
   './js/export.js',
   './js/ui.js',
+  './js/versao.js',
   './js/storage.js',
   './js/camera.js',
   './js/audio.js',
@@ -33,7 +34,7 @@ const ASSETS = [
 self.addEventListener('install', (evento) => {
   evento.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(ASSETS))
+      .then((cache) => cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });

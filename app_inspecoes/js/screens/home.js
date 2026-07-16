@@ -3,6 +3,7 @@
 import { obterInspetor, listarInspecoesAbertas } from '../db.js';
 import { solicitarPersistencia, textoEspacoUsado } from '../storage.js';
 import { el, cabecalho } from '../ui.js';
+import { VERSAO_APP } from '../versao.js';
 
 export async function telaHome() {
   // Primeiro uso: pede armazenamento persistente para as fotos não serem
@@ -16,6 +17,7 @@ export async function telaHome() {
 
   const rodape = el('div', { class: 'info-armazenamento' },
     espaco ? el('div', {}, `💾 ${espaco}`) : null,
+    el('div', {}, `Versão ${VERSAO_APP}`),
     persistente
       ? null
       : el('div', { class: 'aviso-persistencia' },
