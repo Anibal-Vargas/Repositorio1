@@ -123,19 +123,8 @@ export async function coletarDados(inspecaoId) {
   let checklistResumo = null;
 
   const checklist = (inspecao.tipo || 'geral') !== 'geral' ? checklistDoTipo(inspecao.tipo) : null;
-  let usarUnidades = false;
-  if (checklist && (inspecao.tipo === 'paineis' || inspecao.tipo === 'subestacoes')) {
-    if (inspecao.tipo === 'paineis') {
-      usarUnidades = true;
-    } else {
-      // Subestações antigas (respostas sem unidade) usam o formato antigo.
-      const amostra = await db.respostas.where('inspecaoId').equals(inspecaoId).toArray();
-      usarUnidades = !amostra.some((r) => (r.painelId ?? 0) === 0);
-    }
-  }
-  if (checklist && usarUnidades) {
-    // Painéis/Subestações: hierarquia Área/[Sub-área]/Unidade; um
-    // checklist por unidade (painel ou subestação).
+  if (checklist && inspecao.tipo === 'paineis') {
+    // Painéis: hierarquia Área/[Sub-área]/Painel; um checklist por painel.
     const [paineis, respostas, extras] = await Promise.all([
       db.paineis.where('inspecaoId').equals(inspecaoId).sortBy('criadoEm'),
       db.respostas.where('inspecaoId').equals(inspecaoId).toArray(),

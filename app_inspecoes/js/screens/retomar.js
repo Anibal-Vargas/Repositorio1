@@ -29,23 +29,6 @@ export async function telaRetomar() {
         `🎛️ ${nPaineis} ${nPaineis === 1 ? 'painel' : 'painéis'} · ` +
         `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
         `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
-    } else if (inspecao.tipo === 'subestacoes') {
-      const respostas = await obterRespostas(inspecao.id);
-      const legado = respostas.some((r) => (r.painelId ?? 0) === 0);
-      if (legado) {
-        const extras = await contarItensExtras(inspecao.id);
-        const verificados = respostas.filter((r) => r.status).length;
-        linhaProgresso =
-          `✅ ${verificados} de ${totalItens('subestacoes') + extras} itens · ` +
-          `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
-          `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
-      } else {
-        const n = await contarPaineis(inspecao.id);
-        linhaProgresso =
-          `⚡ ${n} ${n === 1 ? 'subestação' : 'subestações'} · ` +
-          `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
-          `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
-      }
     } else if (tipoTemChecklist(inspecao.tipo)) {
       const [respostas, extras] = await Promise.all([
         obterRespostas(inspecao.id),

@@ -25,8 +25,9 @@ export async function telaInspecao(inspecaoId, areaId = null) {
 
   const tipo = inspecao.tipo || 'geral';
 
-  // Painéis e Subestações navegam por áreas/sub-áreas com "unidades"
-  // dentro delas (painel/subestação), cada uma com o próprio checklist.
+  // Painéis navega por áreas/sub-áreas com painéis dentro delas, cada um
+  // com o próprio checklist. Subestações e Documental: um checklist por
+  // inspeção, tela própria.
   const UNIDADES = {
     paineis: {
       plural: 'Painéis', icone: '🎛️',
@@ -35,27 +36,9 @@ export async function telaInspecao(inspecaoId, areaId = null) {
       vazio: 'Nenhum painel cadastrado aqui.',
       criado: (nome) => `Painel "${nome}" criado.`,
     },
-    subestacoes: {
-      plural: 'Subestações', icone: '⚡',
-      placeholder: 'Nome da subestação (ex.: SE-01)',
-      dicaRaiz: 'Crie a primeira área para começar (ex.: Planta 1). As subestações ficam dentro das áreas.',
-      vazio: 'Nenhuma subestação cadastrada aqui.',
-      criado: (nome) => `Subestação "${nome}" criada.`,
-    },
   };
   const unidade = UNIDADES[tipo] || null;
-
-  // Documental: um checklist por inspeção, tela própria.
   if (tipo !== 'geral' && !unidade) return telaChecklist(inspecao);
-
-  // Subestações iniciadas antes da v1.13 (checklist único, sem unidades)
-  // continuam no formato antigo para não perder as respostas.
-  if (tipo === 'subestacoes') {
-    const respostasExistentes = await obterRespostas(inspecaoId);
-    if (respostasExistentes.some((r) => (r.painelId ?? 0) === 0)) {
-      return telaChecklist(inspecao);
-    }
-  }
   const ehPaineis = !!unidade;
 
   const [cliente, area] = await Promise.all([
