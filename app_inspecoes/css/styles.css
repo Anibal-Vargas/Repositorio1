@@ -415,3 +415,34 @@ h2.secao-checklist {
   border-left: 4px solid var(--laranja);
   margin-top: 0.6rem;
 }
+
+/* ---------- Tela de abertura ---------- */
+.tela-inicio {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 2rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+}
+.tela-inicio .logo-inicio {
+  width: min(64vw, 280px);
+  margin-bottom: 1.25rem;
+}
+.tela-inicio h1 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  color: var(--grafite);
+  margin: 0;
+}
+.tela-inicio .marca {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--laranja-forte);
+  margin: 0;
+}
+.tela-inicio .versao {
+  font-size: 0.85rem;
+  color: var(--cinza);
+  margin: 0 0 1.75rem;
+}
+.tela-inicio .btn { max-width: 320px; }
