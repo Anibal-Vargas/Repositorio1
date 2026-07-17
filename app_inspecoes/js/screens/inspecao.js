@@ -38,6 +38,16 @@ export async function telaInspecao(inspecaoId, areaId = null) {
     },
   };
   const unidade = UNIDADES[tipo] || null;
+
+  // Subestações: cadastro das subestações direto na raiz (sem áreas);
+  // cada uma tem o próprio checklist. Inspeções antigas (checklist único,
+  // respostas sem unidade) seguem no formato antigo.
+  if (tipo === 'subestacoes') {
+    const respostasSE = await obterRespostas(inspecaoId);
+    if (respostasSE.some((r) => (r.painelId ?? 0) === 0)) return telaChecklist(inspecao);
+    return telaSubestacoes(inspecao);
+  }
+
   if (tipo !== 'geral' && !unidade) return telaChecklist(inspecao);
   const ehPaineis = !!unidade;
 
@@ -219,6 +229,70 @@ export async function telaInspecao(inspecaoId, areaId = null) {
   }
 
   return [cabecalho(titulo, voltarPara, subtitulo), conteudo];
+}
+
+/** Subestações da inspeção: cadastro + acesso ao checklist de cada uma. */
+async function telaSubestacoes(inspecao) {
+  const inspecaoId = inspecao.id;
+  const [cliente, subestacoes, respostas, extras, ncsTodas] = await Promise.all([
+    db.clientes.get(inspecao.clienteId),
+    listarPaineis(inspecaoId, null),
+    obterRespostas(inspecaoId),
+    listarItensExtras(inspecaoId),
+    db.ncs.where('inspecaoId').equals(inspecaoId).toArray(),
+  ]);
+
+  const conteudo = el('main', { class: 'conteudo' });
+  conteudo.append(el('h2', {}, 'Subestações'));
+
+  if (subestacoes.length) {
+    conteudo.append(el('div', { class: 'lista' },
+      subestacoes.map((se) => {
+        const verificados = respostas.filter((r) => r.painelId === se.id && r.status).length;
+        const total = totalItens('subestacoes') +
+          extras.filter((e) => e.painelId === se.id).length;
+        const ncsDaSE = ncsTodas.filter((nc) => nc.painelId === se.id).length;
+        return el('button', {
+          class: 'cartao',
+          onclick: () => { location.hash = `#/inspecao/${inspecaoId}/painel/${se.id}`; },
+        },
+          el('span', { 'aria-hidden': 'true', style: 'font-size:1.3rem' }, '⚡'),
+          el('span', { class: 'principal' },
+            el('span', { class: 'titulo' }, se.nome),
+            el('span', { class: 'detalhe' },
+              `✅ ${verificados} de ${total} itens` +
+              (ncsDaSE ? ` · ⚠️ ${ncsDaSE} NC` : '')),
+          ),
+          el('span', { class: 'seta', 'aria-hidden': 'true' }, '›'),
+        );
+      }),
+    ));
+  } else {
+    conteudo.append(el('p', { class: 'vazio' },
+      'Cadastre a primeira subestação para abrir o checklist dela.'));
+  }
+
+  const campoSE = el('input', { type: 'text', placeholder: 'Nome da subestação (ex.: SE-01)' });
+  const adicionarSE = async () => {
+    const nome = campoSE.value.trim();
+    if (!nome) { campoSE.focus(); return; }
+    await criarPainel(inspecaoId, null, nome);
+    toast(`Subestação "${nome}" criada.`);
+    telaSubestacoes(inspecao).then((novo) => {
+      document.getElementById('app').replaceChildren(...novo);
+    });
+  };
+  campoSE.addEventListener('keydown', (evento) => { if (evento.key === 'Enter') adicionarSE(); });
+  conteudo.append(el('div', { class: 'linha-form' },
+    campoSE,
+    el('button', { class: 'btn btn-primario', onclick: adicionarSE }, '+ Criar'),
+  ));
+
+  return [
+    cabecalho(cliente ? cliente.nome : 'Inspeção', '#/home',
+      `Subestações · ${formatarDataHora(inspecao.criadoEm)}`),
+    conteudo,
+  ];
 }
 
 /** Total de NCs por área, somando as NCs das sub-áreas na área-mãe. */

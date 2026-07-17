@@ -30,7 +30,7 @@ export async function telaChecklist(inspecao, painel = null) {
     db.clientes.get(inspecao.clienteId),
     obterRespostas(inspecaoId),
     listarItensExtras(inspecaoId),
-    painel ? db.areas.get(painel.areaId) : null,
+    painel && painel.areaId ? db.areas.get(painel.areaId) : null,
   ]);
   const respostas = todasRespostas.filter((r) => (r.painelId ?? 0) === painelId);
   const extras = todosExtras.filter((e) => (e.painelId ?? 0) === painelId);
@@ -40,7 +40,11 @@ export async function telaChecklist(inspecao, painel = null) {
   );
 
   const titulo = painel ? painel.nome : (cliente ? cliente.nome : 'Inspeção');
-  const voltarPara = painel ? `#/inspecao/${inspecaoId}/area/${painel.areaId}` : '#/home';
+  const voltarPara = painel
+    ? (painel.areaId
+        ? `#/inspecao/${inspecaoId}/area/${painel.areaId}`
+        : `#/inspecao/${inspecaoId}`)
+    : '#/home';
   const subtitulo = painel
     ? `${areaDoPainel ? areaDoPainel.nome + ' · ' : ''}${cliente ? cliente.nome : ''}`
     : `${checklist ? checklist.rotulo : ''} · ${formatarDataHora(inspecao.criadoEm)}`;
