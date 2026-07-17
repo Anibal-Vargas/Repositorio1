@@ -30,6 +30,9 @@ async function renderizar() {
   const hash = location.hash || '#/home';
   const token = ++tokenNavegacao;
 
+  // A tela de abertura mostra a logo em destaque: sem marca-d'água nela.
+  document.body.classList.toggle('sem-marca', hash === '#/inicio');
+
   for (const rota of ROTAS) {
     const combinacao = hash.match(rota.padrao);
     if (!combinacao) continue;

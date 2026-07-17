@@ -446,3 +446,4 @@ h2.secao-checklist {
   margin: 0 0 1.75rem;
 }
 .tela-inicio .btn { max-width: 320px; }
+body.sem-marca::before { display: none; }

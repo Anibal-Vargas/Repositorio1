@@ -303,7 +303,7 @@ export async function excluirItemExtra(inspecaoId, itemId) {
 
 // ---------- fotos ----------
 
-export const MAX_FOTOS_POR_NC = 20;
+export const MAX_FOTOS_POR_NC = 100;
 
 export async function adicionarFoto(ncId, blob) {
   const nc = await db.ncs.get(ncId);
