@@ -123,8 +123,19 @@ export async function coletarDados(inspecaoId) {
   let checklistResumo = null;
 
   const checklist = (inspecao.tipo || 'geral') !== 'geral' ? checklistDoTipo(inspecao.tipo) : null;
-  if (checklist && inspecao.tipo === 'paineis') {
-    // Painéis: hierarquia Área/[Sub-área]/Painel; um checklist por painel.
+  let usarUnidades = false;
+  if (checklist && (inspecao.tipo === 'paineis' || inspecao.tipo === 'subestacoes')) {
+    if (inspecao.tipo === 'paineis') {
+      usarUnidades = true;
+    } else {
+      // Subestações antigas (respostas sem unidade) usam o formato antigo.
+      const amostra = await db.respostas.where('inspecaoId').equals(inspecaoId).toArray();
+      usarUnidades = !amostra.some((r) => (r.painelId ?? 0) === 0);
+    }
+  }
+  if (checklist && usarUnidades) {
+    // Painéis/Subestações: hierarquia Área/[Sub-área]/Unidade; um
+    // checklist por unidade (painel ou subestação).
     const [paineis, respostas, extras] = await Promise.all([
       db.paineis.where('inspecaoId').equals(inspecaoId).sortBy('criadoEm'),
       db.respostas.where('inspecaoId').equals(inspecaoId).toArray(),
@@ -443,34 +454,76 @@ function gerarJSON(dados) {
 
 // ---------- pacote ZIP ----------
 
+/** Limite de tamanho por arquivo .zip exportado. */
+export const LIMITE_ZIP_BYTES = 500 * 1024 * 1024;
+
 /**
- * Gera o ZIP da inspeção. aoProgredir(percentual 0–100) é opcional.
- * Retorna { blob, nomeArquivo, dados }.
+ * Gera o(s) ZIP(s) da inspeção. Se o conteúdo passar do limite por
+ * arquivo (500 MB), as NCs são divididas em partes — cada NC fica
+ * inteira em uma única parte. relatorio.html e dados.json vão na parte 1
+ * e referenciam o conjunto todo (extraia todas as partes na mesma pasta).
+ * aoProgredir(parte, totalPartes, percentual) é opcional.
+ * Retorna { pacotes: [{ blob, nomeArquivo }], dados }.
  */
-export async function gerarZip(inspecaoId, aoProgredir) {
+export async function gerarZips(inspecaoId, aoProgredir, limiteBytes = LIMITE_ZIP_BYTES) {
   const dados = await coletarDados(inspecaoId);
-  const zip = new JSZip();
 
-  zip.file('relatorio.html', gerarRelatorioHTML(dados));
-  zip.file('dados.json', gerarJSON(dados));
-
-  // Fotos (JPEG) e áudios já são comprimidos: STORE evita trabalho inútil.
+  const todasNCs = [];
   for (const area of dados.arvore) {
-    const todasNCs = [...area.ncs, ...area.subareas.flatMap((s) => s.ncs)];
-    for (const nc of todasNCs) {
+    todasNCs.push(...area.ncs, ...area.subareas.flatMap((s) => s.ncs));
+  }
+
+  const tamanhoNC = (nc) =>
+    nc.fotos.reduce((soma, f) => soma + f.blob.size, 0) +
+    nc.audios.reduce((soma, a) => soma + a.blob.size, 0) +
+    (nc.descricao ? nc.descricao.length : 0) + 2048;
+
+  // Partição gulosa preservando a ordem das NCs.
+  const grupos = [[]];
+  let acumulado = 512 * 1024; // reserva para relatorio.html + dados.json na parte 1
+  for (const nc of todasNCs) {
+    const tamanho = tamanhoNC(nc);
+    if (grupos[grupos.length - 1].length && acumulado + tamanho > limiteBytes) {
+      grupos.push([]);
+      acumulado = 0;
+    }
+    grupos[grupos.length - 1].push(nc);
+    acumulado += tamanho;
+  }
+
+  const totalPartes = grupos.length;
+  const nomeBase = `Inspecao_NR10_${sanitizarNomeArquivo(dados.cliente ? dados.cliente.nome : 'cliente')}_${new Date(dados.inspecao.criadoEm).toISOString().slice(0, 10)}`;
+  const pacotes = [];
+
+  for (let i = 0; i < totalPartes; i++) {
+    const zip = new JSZip();
+    if (i === 0) {
+      zip.file('relatorio.html', gerarRelatorioHTML(dados));
+      zip.file('dados.json', gerarJSON(dados));
+    }
+    if (totalPartes > 1) {
+      zip.file('LEIA-ME.txt',
+        `Parte ${i + 1} de ${totalPartes} da exportação "${nomeBase}".\n` +
+        'Extraia TODAS as partes na mesma pasta: os arquivos se completam.\n' +
+        'O relatorio.html e o dados.json estão na parte 1 e referenciam o conjunto todo.\n');
+    }
+    // Fotos (JPEG) e áudios já são comprimidos: STORE evita trabalho inútil.
+    for (const nc of grupos[i]) {
       for (const foto of nc.fotos) zip.file(foto.arquivo, foto.blob, { compression: 'STORE' });
       for (const audio of nc.audios) zip.file(audio.arquivo, audio.blob, { compression: 'STORE' });
       if (nc.descricaoArquivo) zip.file(nc.descricaoArquivo, nc.descricao);
       // NC sem nenhum anexo: registra a pasta vazia mesmo assim.
       if (!nc.fotos.length && !nc.audios.length && !nc.descricaoArquivo) zip.folder(nc.pasta);
     }
+    const blob = await zip.generateAsync(
+      { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
+      (meta) => { if (aoProgredir) aoProgredir(i + 1, totalPartes, meta.percent); },
+    );
+    const nomeArquivo = totalPartes === 1
+      ? `${nomeBase}.zip`
+      : `${nomeBase}_parte${i + 1}de${totalPartes}.zip`;
+    pacotes.push({ blob, nomeArquivo });
   }
 
-  const blob = await zip.generateAsync(
-    { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
-    (meta) => { if (aoProgredir) aoProgredir(meta.percent); },
-  );
-
-  const nomeArquivo = `Inspecao_NR10_${sanitizarNomeArquivo(dados.cliente ? dados.cliente.nome : 'cliente')}_${new Date(dados.inspecao.criadoEm).toISOString().slice(0, 10)}.zip`;
-  return { blob, nomeArquivo, dados };
+  return { pacotes, dados };
 }

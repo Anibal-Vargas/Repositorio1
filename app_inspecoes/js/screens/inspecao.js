@@ -23,11 +23,40 @@ export async function telaInspecao(inspecaoId, areaId = null) {
   const inspecao = await obterInspecao(inspecaoId);
   if (!inspecao) { location.hash = '#/home'; return el('div'); }
 
-  // Subestações/Documental: um checklist por inspeção, tela própria.
-  // Painéis usa a navegação de áreas daqui, com painéis dentro delas.
   const tipo = inspecao.tipo || 'geral';
-  if (tipo !== 'geral' && tipo !== 'paineis') return telaChecklist(inspecao);
-  const ehPaineis = tipo === 'paineis';
+
+  // Painéis e Subestações navegam por áreas/sub-áreas com "unidades"
+  // dentro delas (painel/subestação), cada uma com o próprio checklist.
+  const UNIDADES = {
+    paineis: {
+      plural: 'Painéis', icone: '🎛️',
+      placeholder: 'Nome do painel (ex.: QGBT-01)',
+      dicaRaiz: 'Crie a primeira área para começar (ex.: Produção). Os painéis ficam dentro das áreas.',
+      vazio: 'Nenhum painel cadastrado aqui.',
+      criado: (nome) => `Painel "${nome}" criado.`,
+    },
+    subestacoes: {
+      plural: 'Subestações', icone: '⚡',
+      placeholder: 'Nome da subestação (ex.: SE-01)',
+      dicaRaiz: 'Crie a primeira área para começar (ex.: Planta 1). As subestações ficam dentro das áreas.',
+      vazio: 'Nenhuma subestação cadastrada aqui.',
+      criado: (nome) => `Subestação "${nome}" criada.`,
+    },
+  };
+  const unidade = UNIDADES[tipo] || null;
+
+  // Documental: um checklist por inspeção, tela própria.
+  if (tipo !== 'geral' && !unidade) return telaChecklist(inspecao);
+
+  // Subestações iniciadas antes da v1.13 (checklist único, sem unidades)
+  // continuam no formato antigo para não perder as respostas.
+  if (tipo === 'subestacoes') {
+    const respostasExistentes = await obterRespostas(inspecaoId);
+    if (respostasExistentes.some((r) => (r.painelId ?? 0) === 0)) {
+      return telaChecklist(inspecao);
+    }
+  }
+  const ehPaineis = !!unidade;
 
   const [cliente, area] = await Promise.all([
     db.clientes.get(inspecao.clienteId),
@@ -73,8 +102,8 @@ export async function telaInspecao(inspecaoId, areaId = null) {
     } else {
       conteudo.append(el('p', { class: 'vazio' },
         area ? 'Nenhuma sub-área ainda.'
-          : ehPaineis
-            ? 'Crie a primeira área para começar (ex.: Produção). Os painéis ficam dentro das áreas.'
+          : unidade
+            ? unidade.dicaRaiz
             : 'Crie a primeira área para começar (ex.: Produção, Almoxarifado).'));
     }
 
@@ -95,7 +124,7 @@ export async function telaInspecao(inspecaoId, areaId = null) {
 
   // ---- Painéis (tipo Painéis): dentro de área ou sub-área ----
   if (area && ehPaineis) {
-    conteudo.append(el('h2', {}, 'Painéis'));
+    conteudo.append(el('h2', {}, unidade.plural));
 
     const paineis = await listarPaineis(inspecaoId, areaId);
     if (paineis.length) {
@@ -108,14 +137,14 @@ export async function telaInspecao(inspecaoId, areaId = null) {
         paineis.map((painel) => {
           const doPainel = respostas.filter((r) => r.painelId === painel.id);
           const verificados = doPainel.filter((r) => r.status).length;
-          const total = totalItens('paineis') +
+          const total = totalItens(tipo) +
             extras.filter((e) => e.painelId === painel.id).length;
           const ncsDoPainel = ncsTodas.filter((nc) => nc.painelId === painel.id).length;
           return el('button', {
             class: 'cartao',
             onclick: () => { location.hash = `#/inspecao/${inspecaoId}/painel/${painel.id}`; },
           },
-            el('span', { 'aria-hidden': 'true', style: 'font-size:1.3rem' }, '🎛️'),
+            el('span', { 'aria-hidden': 'true', style: 'font-size:1.3rem' }, unidade.icone),
             el('span', { class: 'principal' },
               el('span', { class: 'titulo' }, painel.nome),
               el('span', { class: 'detalhe' },
@@ -127,15 +156,15 @@ export async function telaInspecao(inspecaoId, areaId = null) {
         }),
       ));
     } else {
-      conteudo.append(el('p', { class: 'vazio' }, 'Nenhum painel cadastrado aqui.'));
+      conteudo.append(el('p', { class: 'vazio' }, unidade.vazio));
     }
 
-    const campoPainel = el('input', { type: 'text', placeholder: 'Nome do painel (ex.: QGBT-01)' });
+    const campoPainel = el('input', { type: 'text', placeholder: unidade.placeholder });
     const adicionarPainel = async () => {
       const nome = campoPainel.value.trim();
       if (!nome) { campoPainel.focus(); return; }
       await criarPainel(inspecaoId, areaId, nome);
-      toast(`Painel "${nome}" criado.`);
+      toast(unidade.criado(nome));
       recarregar();
     };
     campoPainel.addEventListener('keydown', (evento) => { if (evento.key === 'Enter') adicionarPainel(); });

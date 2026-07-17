@@ -5,7 +5,7 @@ import {
   db, listarInspecoesAbertas, listarInspecoesFinalizadas,
   progressoInspecao, finalizarInspecao, reabrirInspecao,
 } from '../db.js';
-import { gerarZip } from '../export.js';
+import { gerarZips } from '../export.js';
 import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
 
 const ROTULO_TIPO = {
@@ -89,28 +89,34 @@ async function exportar(inspecao, cliente, botao) {
   const rotuloOriginal = botao.textContent;
   botao.disabled = true;
   try {
-    const { blob, nomeArquivo } = await gerarZip(inspecao.id, (pct) => {
-      botao.textContent = `Gerando… ${Math.round(pct)}%`;
+    const { pacotes } = await gerarZips(inspecao.id, (parte, total, pct) => {
+      botao.textContent = total > 1
+        ? `Gerando parte ${parte}/${total}… ${Math.round(pct)}%`
+        : `Gerando… ${Math.round(pct)}%`;
     });
+    const plural = pacotes.length > 1 ? `s (${pacotes.length} partes)` : '';
 
     // Android: folha de compartilhamento (WhatsApp, Drive, e-mail…).
-    // Sem suporte (ou se falhar): download direto do arquivo.
-    const arquivo = new File([blob], nomeArquivo, { type: 'application/zip' });
-    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+    // Sem suporte (ou se falhar): download direto dos arquivos.
+    const arquivos = pacotes.map((p) => new File([p.blob], p.nomeArquivo, { type: 'application/zip' }));
+    if (navigator.canShare && navigator.canShare({ files: arquivos })) {
       try {
         await navigator.share({
-          files: [arquivo],
+          files: arquivos,
           title: `Inspeção NR-10 — ${cliente ? cliente.nome : ''}`,
         });
-        toast('Pacote compartilhado.');
+        toast(`Pacote${plural} compartilhado${pacotes.length > 1 ? 's' : ''}.`);
         return;
       } catch (erro) {
         if (erro.name === 'AbortError') { toast('Compartilhamento cancelado.'); return; }
         // NotAllowedError etc.: cai para o download.
       }
     }
-    baixar(blob, nomeArquivo);
-    toast('Pacote salvo em Downloads.');
+    for (const pacote of pacotes) {
+      baixar(pacote.blob, pacote.nomeArquivo);
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    toast(`Pacote${plural} salvo${pacotes.length > 1 ? 's' : ''} em Downloads.`);
   } catch (erro) {
     console.error(erro);
     toast('Falha ao gerar o pacote. Tente novamente.');
