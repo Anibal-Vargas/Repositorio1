@@ -23,7 +23,7 @@ export async function telaRetomar() {
       `📍 ${progresso.areas} área${progresso.areas === 1 ? '' : 's'} · ` +
       `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
       `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
-    if (inspecao.tipo === 'paineis') {
+    if (inspecao.tipo === 'paineis' && inspecao.modo !== 'fotos') {
       const nPaineis = await contarPaineis(inspecao.id);
       linhaProgresso =
         `🎛️ ${nPaineis} ${nPaineis === 1 ? 'painel' : 'painéis'} · ` +
@@ -45,7 +45,8 @@ export async function telaRetomar() {
           `⚠️ ${progresso.ncs} NC${progresso.ncs === 1 ? '' : 's'} · ` +
           `📷 ${progresso.fotos} foto${progresso.fotos === 1 ? '' : 's'}`;
       }
-    } else if (tipoTemChecklist(inspecao.tipo)) {
+    } else if (inspecao.tipo !== 'paineis' && tipoTemChecklist(inspecao.tipo)) {
+      // Painéis "somente fotos" mantém a linha padrão de áreas/NCs/fotos.
       const [respostas, extras] = await Promise.all([
         obterRespostas(inspecao.id),
         contarItensExtras(inspecao.id),

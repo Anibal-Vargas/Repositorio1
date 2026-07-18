@@ -122,7 +122,10 @@ export async function coletarDados(inspecaoId) {
   const arvore = [];
   let checklistResumo = null;
 
-  const checklist = (inspecao.tipo || 'geral') !== 'geral' ? checklistDoTipo(inspecao.tipo) : null;
+  // Painéis "somente fotos" não tem checklist: exporta igual à Geral.
+  const semChecklist = (inspecao.tipo || 'geral') === 'geral'
+    || (inspecao.tipo === 'paineis' && inspecao.modo === 'fotos');
+  const checklist = semChecklist ? null : checklistDoTipo(inspecao.tipo);
   let usarUnidades = false;
   if (checklist && (inspecao.tipo === 'paineis' || inspecao.tipo === 'subestacoes')) {
     if (inspecao.tipo === 'paineis') {

@@ -75,7 +75,7 @@ export async function criarCliente(nome) {
 
 // ---------- inspeções ----------
 
-export async function criarInspecao(clienteId, tipo, inspetorNome = null) {
+export async function criarInspecao(clienteId, tipo, inspetorNome = null, extras = {}) {
   if (inspetorNome === null) {
     const inspetor = await obterInspetor();
     inspetorNome = inspetor ? inspetor.nome : '';
@@ -84,6 +84,8 @@ export async function criarInspecao(clienteId, tipo, inspetorNome = null) {
   const id = await db.inspecoes.add({
     clienteId,
     tipo,
+    // Painéis: modo 'checklist' (padrão) ou 'fotos' (fluxo da Geral)
+    ...extras,
     status: 'aberta',
     inspetorNome,
     contadorNC: 0,

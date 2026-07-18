@@ -68,20 +68,21 @@ export async function telaNovaInspecao() {
     if (novo) campoClienteNovo.focus();
   });
 
-  // ---- Início da inspeção (toque no tipo) ----
-  async function iniciar(tipo) {
+  // ---- Validação do inspetor/cliente (comum a todos os tipos) ----
+  // Retorna { nome, clienteId } ou null se algo estiver faltando.
+  async function resolverInspetorCliente() {
     let nome = seletorInspetor.value;
-    if (!nome) { toast('Selecione o inspetor.'); seletorInspetor.focus(); return; }
+    if (!nome) { toast('Selecione o inspetor.'); seletorInspetor.focus(); return null; }
     if (nome === OUTRO) {
       nome = campoInspetorOutro.value.trim();
-      if (!nome) { toast('Digite o nome do inspetor.'); campoInspetorOutro.focus(); return; }
+      if (!nome) { toast('Digite o nome do inspetor.'); campoInspetorOutro.focus(); return null; }
     }
 
     let clienteId = seletorCliente.value;
-    if (!clienteId) { toast('Selecione o cliente.'); seletorCliente.focus(); return; }
+    if (!clienteId) { toast('Selecione o cliente.'); seletorCliente.focus(); return null; }
     if (clienteId === NOVO_CLIENTE) {
       const nomeCliente = campoClienteNovo.value.trim();
-      if (!nomeCliente) { toast('Digite o nome do cliente.'); campoClienteNovo.focus(); return; }
+      if (!nomeCliente) { toast('Digite o nome do cliente.'); campoClienteNovo.focus(); return null; }
       const cliente = await criarCliente(nomeCliente);
       clienteId = cliente.id;
     } else {
@@ -94,9 +95,64 @@ export async function telaNovaInspecao() {
       : (inspetorSalvo ? inspetorSalvo.empresa : '') || '';
     await salvarInspetor({ nome, empresa, criadoEm: Date.now() });
 
-    const id = await criarInspecao(clienteId, tipo, nome);
+    return { nome, clienteId };
+  }
+
+  async function criarEAbrir(clienteId, tipo, nome, extras = {}) {
+    const id = await criarInspecao(clienteId, tipo, nome, extras);
     toast('Inspeção criada. Tudo é salvo automaticamente.');
     location.hash = `#/inspecao/${id}`;
+  }
+
+  // ---- Início da inspeção (toque no tipo) ----
+  async function iniciar(tipo) {
+    // Painéis: perguntar antes se usa checklist ou somente fotos.
+    if (tipo === 'paineis') { escolherModoPaineis(); return; }
+    const dados = await resolverInspetorCliente();
+    if (!dados) return;
+    await criarEAbrir(dados.clienteId, tipo, dados.nome);
+  }
+
+  // ---- Painéis: escolha entre checklist e somente fotos ----
+  async function escolherModoPaineis() {
+    const dados = await resolverInspetorCliente();
+    if (!dados) return;
+    const criar = (modo) => criarEAbrir(dados.clienteId, 'paineis', dados.nome, { modo });
+    // Voltar re-renderiza a tela de nova inspeção (o hash continua #/nova,
+    // então trocar location.hash não dispararia um novo render).
+    const voltar = () => telaNovaInspecao().then((novo) => {
+      document.getElementById('app').replaceChildren(...(Array.isArray(novo) ? novo : [novo]));
+    });
+    const h1 = el('h1', {}, 'Inspeção de painéis',
+      el('span', { class: 'subtitulo' }, 'Como deseja registrar?'));
+    const cabecalhoModo = el('header', { class: 'cabecalho' },
+      el('button', { class: 'btn-voltar', 'aria-label': 'Voltar', onclick: voltar }, '←'),
+      h1,
+    );
+    const tela = [
+      cabecalhoModo,
+      el('main', { class: 'conteudo' },
+        el('div', { class: 'lista' },
+          el('button', { class: 'cartao', onclick: () => criar('checklist') },
+            el('span', { 'aria-hidden': 'true', style: 'font-size:1.4rem' }, '📋'),
+            el('span', { class: 'principal' },
+              el('span', { class: 'titulo' }, 'Usar checklist'),
+              el('span', { class: 'detalhe' }, 'Área › sub-área › painel, com itens de verificação'),
+            ),
+            el('span', { class: 'seta', 'aria-hidden': 'true' }, '›'),
+          ),
+          el('button', { class: 'cartao', onclick: () => criar('fotos') },
+            el('span', { 'aria-hidden': 'true', style: 'font-size:1.4rem' }, '📷'),
+            el('span', { class: 'principal' },
+              el('span', { class: 'titulo' }, 'Somente fotos'),
+              el('span', { class: 'detalhe' }, 'Fluxo da inspeção Geral: áreas e sub-áreas com NCs e fotos'),
+            ),
+            el('span', { class: 'seta', 'aria-hidden': 'true' }, '›'),
+          ),
+        ),
+      ),
+    ];
+    document.getElementById('app').replaceChildren(...tela);
   }
 
   return [

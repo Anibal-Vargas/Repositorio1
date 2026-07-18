@@ -49,7 +49,8 @@ export async function telaInspecao(inspecaoId, areaId = null) {
   }
 
   if (tipo !== 'geral' && !unidade) return telaChecklist(inspecao);
-  const ehPaineis = !!unidade;
+  // Painéis "somente fotos" segue o fluxo da Geral (áreas → sub-áreas → NCs).
+  const ehPaineis = !!unidade && inspecao.modo !== 'fotos';
 
   const [cliente, area] = await Promise.all([
     db.clientes.get(inspecao.clienteId),
@@ -95,7 +96,7 @@ export async function telaInspecao(inspecaoId, areaId = null) {
     } else {
       conteudo.append(el('p', { class: 'vazio' },
         area ? 'Nenhuma sub-área ainda.'
-          : unidade
+          : ehPaineis
             ? unidade.dicaRaiz
             : 'Crie a primeira área para começar (ex.: Produção, Almoxarifado).'));
     }
