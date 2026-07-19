@@ -1,7 +1,7 @@
 // Service Worker — cache offline-first de todos os assets do app.
 // Para publicar uma atualização, incremente VERSAO: o SW novo instala,
 // assume imediatamente (skipWaiting) e a página recarrega sozinha.
-const VERSAO = 'v1.16.0';
+const VERSAO = 'v1.16.1';
 const CACHE = `inspecoes-${VERSAO}`;
 
 const ASSETS = [

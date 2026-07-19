@@ -49,8 +49,10 @@ export async function telaInspecao(inspecaoId, areaId = null) {
   }
 
   if (tipo !== 'geral' && !unidade) return telaChecklist(inspecao);
-  // Painéis "somente fotos" segue o fluxo da Geral (áreas → sub-áreas → NCs).
-  const ehPaineis = !!unidade && inspecao.modo !== 'fotos';
+  // Painéis "somente fotos" segue o fluxo da Geral (áreas → sub-áreas → NCs),
+  // mas o nível abaixo da área chama-se "Painel" em vez de "Sub-área".
+  const ehPaineisFotos = tipo === 'paineis' && inspecao.modo === 'fotos';
+  const ehPaineis = !!unidade && !ehPaineisFotos;
 
   const [cliente, area] = await Promise.all([
     db.clientes.get(inspecao.clienteId),
@@ -71,11 +73,13 @@ export async function telaInspecao(inspecaoId, areaId = null) {
   const conteudo = el('main', { class: 'conteudo' });
 
   // ---- Sub-níveis: áreas na raiz; sub-áreas dentro de área raiz ----
+  // No modo "somente fotos" de Painéis, o nível abaixo da área é "Painel".
+  const filhaSingular = area && ehPaineisFotos ? 'Painel' : (area ? 'Sub-área' : 'Área');
+  const filhaPlural = area && ehPaineisFotos ? 'Painéis' : (area ? 'Sub-áreas' : 'Áreas');
   const podeTerFilhas = !area || areaRaiz; // sub-área não tem filhas (1 nível)
   if (podeTerFilhas) {
     const filhas = await listarAreas(inspecaoId, areaId);
-    const rotulo = area ? 'Sub-áreas' : 'Áreas';
-    conteudo.append(el('h2', {}, rotulo));
+    conteudo.append(el('h2', {}, filhaPlural));
 
     if (filhas.length) {
       const contagens = await contagemNCsPorArea(inspecaoId);
@@ -95,18 +99,19 @@ export async function telaInspecao(inspecaoId, areaId = null) {
       ));
     } else {
       conteudo.append(el('p', { class: 'vazio' },
-        area ? 'Nenhuma sub-área ainda.'
+        area
+          ? (ehPaineisFotos ? 'Nenhum painel ainda.' : 'Nenhuma sub-área ainda.')
           : ehPaineis
             ? unidade.dicaRaiz
             : 'Crie a primeira área para começar (ex.: Produção, Almoxarifado).'));
     }
 
-    const campoArea = el('input', { type: 'text', placeholder: area ? 'Nova sub-área' : 'Nova área' });
+    const campoArea = el('input', { type: 'text', placeholder: `Nov${area && ehPaineisFotos ? 'o' : 'a'} ${filhaSingular.toLowerCase()}` });
     const adicionar = async () => {
       const nome = campoArea.value.trim();
       if (!nome) { campoArea.focus(); return; }
       await criarArea(inspecaoId, nome, areaId);
-      toast(`${area ? 'Sub-área' : 'Área'} "${nome}" criada.`);
+      toast(`${filhaSingular} "${nome}" ${area && ehPaineisFotos ? 'criado' : 'criada'}.`);
       recarregar();
     };
     campoArea.addEventListener('keydown', (evento) => { if (evento.key === 'Enter') adicionar(); });
