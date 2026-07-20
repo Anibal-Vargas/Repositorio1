@@ -1,16 +1,24 @@
-// camera.js — captura de foto pela câmera e compressão antes de salvar.
+// camera.js — captura de foto pela câmera nativa, preservando a resolução.
 // A câmera é acionada por <input type="file" capture> (funciona offline e
-// abre o app de câmera nativo do Android). A foto é redimensionada para no
-// máximo 1920px no maior lado e recomprimida como JPEG qualidade 0.8.
+// abre o app de câmera nativo do Android). A foto é gravada na resolução
+// original da câmera do aparelho: NÃO há redimensionamento. Fotos JPEG (o
+// caso normal no Android) são guardadas byte a byte, exatamente como a
+// câmera as produziu. Só formatos não-JPEG (ex.: HEIC/PNG) são convertidos
+// para JPEG — na resolução cheia — para garantir que abram no relatório.
 
-const LADO_MAXIMO = 1920;
-const QUALIDADE_JPEG = 0.8;
+const QUALIDADE_JPEG = 0.95;
 
 /**
- * Comprime um File/Blob de imagem. Retorna um Blob JPEG.
- * Usa createImageBitmap com correção de orientação EXIF (Chrome/Android).
+ * Prepara um File/Blob de imagem para gravação, mantendo a resolução da
+ * câmera. Devolve o próprio arquivo quando já é JPEG; caso contrário,
+ * converte para JPEG em resolução cheia (sem reduzir o tamanho).
  */
-export async function comprimirFoto(arquivo) {
+export async function prepararFoto(arquivo) {
+  // JPEG da câmera: mantém os bytes originais (resolução e qualidade máximas,
+  // orientação EXIF preservada — o navegador orienta a <img> automaticamente).
+  if (arquivo && arquivo.type === 'image/jpeg') return arquivo;
+
+  // Outros formatos: converte para JPEG mantendo a resolução original.
   let imagem;
   try {
     imagem = await createImageBitmap(arquivo, { imageOrientation: 'from-image' });
@@ -18,20 +26,16 @@ export async function comprimirFoto(arquivo) {
     imagem = await carregarViaImg(arquivo);
   }
 
-  const escala = Math.min(1, LADO_MAXIMO / Math.max(imagem.width, imagem.height));
-  const largura = Math.round(imagem.width * escala);
-  const altura = Math.round(imagem.height * escala);
-
   const canvas = document.createElement('canvas');
-  canvas.width = largura;
-  canvas.height = altura;
-  canvas.getContext('2d').drawImage(imagem, 0, 0, largura, altura);
+  canvas.width = imagem.width;
+  canvas.height = imagem.height;
+  canvas.getContext('2d').drawImage(imagem, 0, 0);
   if (imagem.close) imagem.close();
 
   const blob = await new Promise((resolver) =>
     canvas.toBlob(resolver, 'image/jpeg', QUALIDADE_JPEG)
   );
-  if (!blob) throw new Error('Falha ao comprimir a foto.');
+  if (!blob) throw new Error('Falha ao processar a foto.');
   return blob;
 }
 
@@ -66,7 +70,7 @@ export function capturarFoto() {
       limpar();
       if (!arquivo) return resolver(null);
       try {
-        resolver(await comprimirFoto(arquivo));
+        resolver(await prepararFoto(arquivo));
       } catch (erro) {
         rejeitar(erro);
       }
