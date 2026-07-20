@@ -117,6 +117,23 @@ export async function reabrirInspecao(id) {
   await db.inspecoes.update(id, { status: 'aberta', atualizadoEm: Date.now() });
 }
 
+/** Exclui a inspeção e TUDO que pertence a ela (áreas, painéis, NCs,
+ * fotos, áudios, respostas e itens adicionais). Irreversível. */
+export async function excluirInspecao(id) {
+  await db.transaction('rw',
+    db.inspecoes, db.areas, db.ncs, db.fotos, db.audios,
+    db.respostas, db.itensExtras, db.paineis, async () => {
+      await db.fotos.where('inspecaoId').equals(id).delete();
+      await db.audios.where('inspecaoId').equals(id).delete();
+      await db.ncs.where('inspecaoId').equals(id).delete();
+      await db.respostas.where('inspecaoId').equals(id).delete();
+      await db.itensExtras.where('inspecaoId').equals(id).delete();
+      await db.paineis.where('inspecaoId').equals(id).delete();
+      await db.areas.where('inspecaoId').equals(id).delete();
+      await db.inspecoes.delete(id);
+    });
+}
+
 function tocarInspecao(id) {
   return db.inspecoes.update(id, { atualizadoEm: Date.now() });
 }

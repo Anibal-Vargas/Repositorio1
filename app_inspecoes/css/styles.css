@@ -355,8 +355,8 @@ textarea { resize: vertical; min-height: 100px; }
 
 /* ---------- Exportação ---------- */
 .cartao-coluna { flex-direction: column; align-items: stretch; cursor: default; }
-.acoes-linha { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
-.acoes-linha .btn { min-height: 44px; font-size: 0.92rem; padding: 0.4rem 0.5rem; }
+.acoes-linha { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.acoes-linha .btn { flex: 1 1 auto; min-height: 44px; font-size: 0.92rem; padding: 0.4rem 0.5rem; }
 
 /* ---------- Checklist (Fase 4) ---------- */
 .progresso-checklist {

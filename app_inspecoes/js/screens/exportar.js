@@ -3,7 +3,7 @@
 
 import {
   db, listarInspecoesAbertas, listarInspecoesFinalizadas,
-  progressoInspecao, finalizarInspecao, reabrirInspecao,
+  progressoInspecao, finalizarInspecao, reabrirInspecao, excluirInspecao,
 } from '../db.js';
 import { gerarZips } from '../export.js';
 import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
@@ -73,6 +73,22 @@ async function cartaoInspecao(inspecao, conteudo) {
     },
   }, aberta ? '✔️ Finalizar' : '↩️ Reabrir');
 
+  // Excluir: só para inspeções finalizadas (evita apagar trabalho em andamento).
+  const botaoExcluir = aberta ? null : el('button', {
+    class: 'btn btn-perigo',
+    onclick: async () => {
+      const nome = cliente ? cliente.nome : 'esta inspeção';
+      if (!confirm(
+        `Excluir DEFINITIVAMENTE a inspeção de "${nome}"?\n\n` +
+        `Serão apagados ${progresso.ncs} NC(s) e ${progresso.fotos} foto(s), ` +
+        'junto com áudios, descrições e checklists. Esta ação não pode ser desfeita.\n\n' +
+        'Dica: exporte o pacote .zip antes, se ainda precisar dos dados.')) return;
+      await excluirInspecao(inspecao.id);
+      toast('Inspeção excluída.');
+      montar(conteudo);
+    },
+  }, '🗑️ Excluir');
+
   return el('div', { class: 'cartao cartao-coluna' },
     el('span', { class: 'principal' },
       el('span', { class: 'titulo' }, cliente ? cliente.nome : 'Cliente removido'),
@@ -81,7 +97,7 @@ async function cartaoInspecao(inspecao, conteudo) {
       el('span', { class: 'detalhe' },
         `📍 ${progresso.areas} área(s) · ⚠️ ${progresso.ncs} NC(s) · 📷 ${progresso.fotos} foto(s)`),
     ),
-    el('div', { class: 'acoes-linha' }, botaoExportar, botaoStatus),
+    el('div', { class: 'acoes-linha' }, botaoExportar, botaoStatus, botaoExcluir),
   );
 }
 
