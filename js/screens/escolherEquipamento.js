@@ -2,7 +2,7 @@
 // 1) escolher (ou criar) o setor; 2) registrar as máquinas/equipamentos do setor,
 // uma após a outra, sem precisar reescolher o setor.
 
-import { el, cabecalho, toast } from '../ui.js';
+import { el, cabecalho, toast, botaoDitado } from '../ui.js';
 import {
   obterInspecao,
   listarSetores,
@@ -177,6 +177,7 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
         'div',
         { class: 'linha-form' },
         campoNome,
+        botaoDitado(campoNome),
         el('button', { class: 'btn btn-secundario', onclick: criarEIncluir }, '+ Criar')
       ),
       el('h2', {}, 'Terminou este setor?'),

@@ -1,7 +1,7 @@
 // Registro de uma máquina/equipamento na inspeção:
 // fotos por categoria (01 a 04), áudios (05) e observação (06).
 
-import { el, cabecalho, toast, debounce, formatarDataHora } from '../ui.js';
+import { el, cabecalho, toast, debounce, formatarDataHora, botaoDitado } from '../ui.js';
 import {
   obterInspecao,
   obterEquipamento,
@@ -291,7 +291,14 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
       { class: 'conteudo' },
       CATEGORIAS_FOTO.map(montarSecaoFotos),
       el('section', { class: 'secao-registro' }, el('h2', {}, '05 · Gravar áudio (opcional)'), listaAudios, !somenteLeitura ? botaoGravar : null),
-      el('section', { class: 'secao-registro' }, el('h2', {}, '06 · Escrever observação (opcional)'), campoObservacao),
+      el(
+        'section',
+        { class: 'secao-registro' },
+        el('h2', {}, '06 · Escrever observação (opcional)'),
+        somenteLeitura
+          ? campoObservacao
+          : el('div', { class: 'linha-form' }, campoObservacao, botaoDitado(campoObservacao))
+      ),
       el(
         'button',
         { class: 'btn btn-primario btn-grande', onclick: concluir },

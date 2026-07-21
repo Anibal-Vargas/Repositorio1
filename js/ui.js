@@ -63,3 +63,67 @@ export function debounce(funcao, espera = 500) {
     temporizador = setTimeout(() => funcao(...args), espera);
   };
 }
+
+// Botão de ditado por voz (🎤) para um campo de texto. Usa o reconhecimento
+// de fala do navegador (pt-BR), que precisa de internet — offline ou sem
+// suporte, avisa e o usuário digita normalmente. O texto reconhecido é
+// acrescentado ao campo e dispara o evento "input" (aciona o autosave).
+export function botaoDitado(campo) {
+  const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const botao = el(
+    'button',
+    { class: 'btn-ditado', type: 'button', title: 'Ditar por voz', 'aria-label': 'Ditar por voz' },
+    '🎤'
+  );
+  let reconhecedor = null;
+
+  botao.addEventListener('click', () => {
+    if (reconhecedor) {
+      reconhecedor.stop();
+      return;
+    }
+    if (!Reconhecimento) {
+      toast('Ditado por voz indisponível neste navegador — digite o texto.');
+      return;
+    }
+    if (navigator.onLine === false) {
+      toast('Ditado indisponível sem internet — digite o texto.');
+      return;
+    }
+    reconhecedor = new Reconhecimento();
+    reconhecedor.lang = 'pt-BR';
+    reconhecedor.interimResults = false;
+    reconhecedor.maxAlternatives = 1;
+    reconhecedor.onresult = (evento) => {
+      const texto = evento.results[0][0].transcript.trim();
+      if (!texto) return;
+      campo.value = campo.value.trim() ? `${campo.value.trim()} ${texto}` : texto;
+      campo.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    reconhecedor.onerror = (evento) => {
+      if (evento.error === 'not-allowed' || evento.error === 'service-not-allowed') {
+        toast('Permita o acesso ao microfone para ditar.');
+      } else if (evento.error === 'no-speech') {
+        toast('Não entendi — tente de novo.');
+      } else if (evento.error === 'network') {
+        toast('Ditado indisponível sem internet — digite o texto.');
+      } else if (evento.error !== 'aborted') {
+        toast('Erro no ditado — digite o texto.');
+      }
+    };
+    reconhecedor.onend = () => {
+      reconhecedor = null;
+      botao.classList.remove('gravando');
+    };
+    try {
+      reconhecedor.start();
+      botao.classList.add('gravando');
+      toast('Fale agora…');
+    } catch {
+      reconhecedor = null;
+      toast('Erro ao iniciar o ditado.');
+    }
+  });
+
+  return botao;
+}
