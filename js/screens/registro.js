@@ -310,7 +310,7 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     const resumo = await resumoDoEquipamento(inspecaoId, equipamentoId);
     if (!resumo.completo) {
       const continuar = confirm(
-        `Ainda faltam fotos obrigatórias: ${resumo.pendentes.join(', ')}. Concluir mesmo assim? A máquina ficará marcada como pendente.`
+        `Ainda faltam itens obrigatórios: ${resumo.pendentes.join(', ')}. Concluir mesmo assim? A máquina ficará marcada como pendente.`
       );
       if (!continuar) return;
     }

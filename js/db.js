@@ -230,12 +230,15 @@ export async function removerEquipamentoDaInspecao(inspecaoId, equipamentoId) {
   });
 }
 
-// Resumo do registro: { completo, pendentes } com base nas fotos obrigatórias.
+// Resumo do registro: { completo, pendentes } com base nos itens obrigatórios
+// (fotos 01 e 02 e a marcação de resultado conforme/não conforme).
 export async function resumoDoEquipamento(inspecaoId, equipamentoId) {
   const fotos = await listarFotos(inspecaoId, equipamentoId);
   const pendentes = CATEGORIAS_FOTO.filter(
     (categoria) => categoria.obrigatoria && !fotos.some((f) => f.categoria === categoria.id)
   ).map((categoria) => categoria.rotulo);
+  const registro = await obterRegistro(inspecaoId, equipamentoId);
+  if (!registro?.resultado) pendentes.push('Resultado da medição (conforme/não conforme)');
   return { completo: pendentes.length === 0, pendentes, totalFotos: fotos.length };
 }
 

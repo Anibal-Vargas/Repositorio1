@@ -72,7 +72,7 @@ export async function telaInspecao(inspecaoId) {
       }
       let mensagem = 'Finalizar esta inspeção? Depois de finalizada ela fica somente leitura.';
       if (pendentes.length > 0) {
-        mensagem = `Faltam fotos obrigatórias em: ${pendentes.join('; ')}. ${mensagem}`;
+        mensagem = `Faltam itens obrigatórios em: ${pendentes.join('; ')}. ${mensagem}`;
       }
       if (!confirm(mensagem)) return;
       await atualizarInspecao(inspecaoId, { status: 'finalizada' });

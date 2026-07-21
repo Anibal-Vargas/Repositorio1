@@ -193,6 +193,12 @@ export async function telaExportar(inspecaoId) {
         arquivosAudios.push(nome);
       });
 
+      // Resultado da medição: "resultado.txt" ("conforme" / "não conforme").
+      const rotulo = rotuloResultado(registro?.resultado);
+      if (rotulo) {
+        pastaEquipamento.file('resultado.txt', rotulo.toLowerCase());
+      }
+
       // Observação: "observação.txt".
       if (registro?.observacao) {
         pastaEquipamento.file('observação.txt', registro.observacao);
