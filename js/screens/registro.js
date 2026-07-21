@@ -154,6 +154,56 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     );
   }
 
+  /* ---------- Resultado da medição (Conforme / Não conforme) ---------- */
+
+  // Item que aparece logo após a foto do valor medido: o inspetor seleciona
+  // se o valor medido está conforme ou não conforme. Toca de novo para limpar.
+  function montarResultado() {
+    const opcoes = {
+      conforme: el('button', { class: 'btn-opcao', type: 'button' }, 'Conforme'),
+      nc: el('button', { class: 'btn-opcao', type: 'button' }, 'Não conforme'),
+    };
+
+    function pintar() {
+      opcoes.conforme.classList.toggle('sel-conforme', registro.resultado === 'conforme');
+      opcoes.nc.classList.toggle('sel-nc', registro.resultado === 'nc');
+    }
+    pintar();
+
+    for (const [valor, botao] of Object.entries(opcoes)) {
+      botao.addEventListener('click', async () => {
+        if (somenteLeitura) {
+          toast('Inspeção finalizada — somente leitura.');
+          return;
+        }
+        registro.resultado = registro.resultado === valor ? null : valor;
+        await atualizarRegistro(registro.id, { resultado: registro.resultado });
+        pintar();
+        toast('Salvo.');
+      });
+    }
+
+    return el(
+      'section',
+      { class: 'secao-registro' },
+      el('h2', {}, 'Resultado da medição'),
+      el(
+        'div',
+        { class: 'item-checklist' },
+        el('div', { class: 'descricao' }, 'O valor medido está conforme?'),
+        el('div', { class: 'opcoes-status' }, opcoes.conforme, opcoes.nc)
+      )
+    );
+  }
+
+  // Monta as seções de foto em ordem, inserindo o resultado da medição
+  // logo após a "Foto do valor medido" (categoria 02).
+  const secoesFotos = [];
+  for (const categoria of CATEGORIAS_FOTO) {
+    secoesFotos.push(montarSecaoFotos(categoria));
+    if (categoria.id === 'valor') secoesFotos.push(montarResultado());
+  }
+
   /* ---------- Áudios ---------- */
 
   const listaAudios = el('div', { class: 'lista' });
@@ -289,7 +339,7 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     el(
       'main',
       { class: 'conteudo' },
-      CATEGORIAS_FOTO.map(montarSecaoFotos),
+      secoesFotos,
       el('section', { class: 'secao-registro' }, el('h2', {}, '05 · Gravar áudio (opcional)'), listaAudios, !somenteLeitura ? botaoGravar : null),
       el(
         'section',

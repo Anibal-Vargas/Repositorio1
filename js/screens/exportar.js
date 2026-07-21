@@ -28,6 +28,12 @@ function nomeSeguro(texto) {
   return texto.replace(/[\\/:*?"<>|]/g, '-').trim();
 }
 
+function rotuloResultado(resultado) {
+  if (resultado === 'conforme') return 'Conforme';
+  if (resultado === 'nc') return 'Não conforme';
+  return null;
+}
+
 function extensaoDoAudio(blob) {
   if (blob.type.includes('ogg')) return 'ogg';
   if (blob.type.includes('mp4') || blob.type.includes('aac')) return 'm4a';
@@ -43,17 +49,27 @@ function caminhoUrl(...segmentos) {
 function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   const secoes = blocos
     .map(({ equipamento, nomeSetor, registro, pasta, arquivosFotos, arquivosAudios }) => {
+      const resultado = rotuloResultado(registro?.resultado);
+      const resultadoHtml = resultado
+        ? `<p class="resultado ${registro.resultado === 'nc' ? 'nc' : 'ok'}">Resultado da medição: <strong>${resultado}</strong></p>`
+        : '';
+
       const grupos = CATEGORIAS_FOTO.map((categoria) => {
         const nomes = arquivosFotos[categoria.id] || [];
+        let bloco;
         if (nomes.length === 0) {
-          return categoria.obrigatoria
+          bloco = categoria.obrigatoria
             ? `<p class="pendente">${categoria.numero} · ${escapar(categoria.rotulo)}: <strong>sem foto (obrigatória)</strong></p>`
             : '';
-        }
-        return `<h3>${categoria.numero} · ${escapar(categoria.rotulo)}</h3>
+        } else {
+          bloco = `<h3>${categoria.numero} · ${escapar(categoria.rotulo)}</h3>
           <div class="fotos">${nomes
             .map((nome) => `<img src="${caminhoUrl('Fotos', pasta, nome)}" alt="Foto">`)
             .join('')}</div>`;
+        }
+        // O resultado da medição aparece logo após a foto do valor medido (02).
+        if (categoria.id === 'valor') bloco += resultadoHtml;
+        return bloco;
       }).join('');
 
       const audiosHtml = arquivosAudios.length
@@ -90,6 +106,9 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   .fotos { display: flex; flex-wrap: wrap; gap: 8px; }
   .fotos img { width: 200px; height: 200px; object-fit: cover; border: 1px solid #e5e7eb; border-radius: 8px; }
   .pendente { color: #b3261e; }
+  .resultado { font-size: 0.95rem; margin: 10px 0; }
+  .resultado.ok { color: #2e7d32; }
+  .resultado.nc { color: #b3261e; }
   footer { margin-top: 32px; color: #6b7280; font-size: 0.8rem; }
   @media print { .fotos img { width: 150px; height: 150px; } }
 </style>
@@ -185,6 +204,7 @@ export async function telaExportar(inspecaoId) {
         ...equipamento,
         setor: nomeSetor,
         pasta: `Fotos/${pasta}`,
+        resultadoMedicao: rotuloResultado(registro?.resultado),
         observacao: registro?.observacao ?? '',
         fotos: arquivosFotos,
         audios: arquivosAudios,
