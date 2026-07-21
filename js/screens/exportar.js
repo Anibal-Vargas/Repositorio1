@@ -1,10 +1,14 @@
-// Exportação da inspeção: pacote .zip com relatório HTML, dados JSON, fotos e áudios.
+// Exportação da inspeção: pacote .zip com relatório HTML, dados JSON e a
+// estrutura Fotos/<máquina>/ com arquivos de nomes fixos:
+// 01 (máquina), 02 (valor medido), 03 (prancheta), 04 a 14 (adicionais),
+// "áudio" e "observação".
 
 import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
 import { VERSAO_APP } from '../versao.js';
 import {
   obterInspecao,
   obterCliente,
+  obterSetor,
   equipamentosDaInspecao,
   obterRegistro,
   listarFotos,
@@ -19,24 +23,42 @@ function escapar(texto) {
     .replaceAll('>', '&gt;');
 }
 
+// Remove caracteres inválidos em nomes de pasta/arquivo, preservando o resto.
+function nomeSeguro(texto) {
+  return texto.replace(/[\\/:*?"<>|]/g, '-').trim();
+}
+
+function extensaoDoAudio(blob) {
+  if (blob.type.includes('ogg')) return 'ogg';
+  if (blob.type.includes('mp4') || blob.type.includes('aac')) return 'm4a';
+  return 'webm';
+}
+
+// Caminho relativo codificado para uso em src/href do relatório.
+function caminhoUrl(...segmentos) {
+  return segmentos.map(encodeURIComponent).join('/');
+}
+
 // Monta o relatório HTML autocontido (abre em qualquer navegador, imprime em A4).
 function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   const secoes = blocos
-    .map(({ equipamento, registro, fotosPorCategoria, nomesAudios }) => {
+    .map(({ equipamento, nomeSetor, registro, pasta, arquivosFotos, arquivosAudios }) => {
       const grupos = CATEGORIAS_FOTO.map((categoria) => {
-        const nomes = fotosPorCategoria[categoria.id] || [];
+        const nomes = arquivosFotos[categoria.id] || [];
         if (nomes.length === 0) {
           return categoria.obrigatoria
             ? `<p class="pendente">${categoria.numero} · ${escapar(categoria.rotulo)}: <strong>sem foto (obrigatória)</strong></p>`
             : '';
         }
         return `<h3>${categoria.numero} · ${escapar(categoria.rotulo)}</h3>
-          <div class="fotos">${nomes.map((nome) => `<img src="fotos/${nome}" alt="Foto">`).join('')}</div>`;
+          <div class="fotos">${nomes
+            .map((nome) => `<img src="${caminhoUrl('Fotos', pasta, nome)}" alt="Foto">`)
+            .join('')}</div>`;
       }).join('');
 
-      const audiosHtml = nomesAudios.length
-        ? `<h3>05 · Áudios</h3><ul>${nomesAudios
-            .map((nome) => `<li><a href="audios/${nome}">${nome}</a></li>`)
+      const audiosHtml = arquivosAudios.length
+        ? `<h3>05 · Áudios</h3><ul>${arquivosAudios
+            .map((nome) => `<li><a href="${caminhoUrl('Fotos', pasta, nome)}">${escapar(nome)}</a></li>`)
             .join('')}</ul>`
         : '';
 
@@ -45,7 +67,7 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
         : '';
 
       return `<section>
-        <h2>${escapar(equipamento.nome)}${equipamento.setor ? ` — ${escapar(equipamento.setor)}` : ''}</h2>
+        <h2>${escapar(equipamento.nome)}${nomeSetor ? ` — Setor: ${escapar(nomeSetor)}` : ''}</h2>
         ${grupos}
         ${audiosHtml}
         ${observacaoHtml}
@@ -88,12 +110,6 @@ ${inspecao.observacoes ? `<section><h2>Observações gerais</h2><p>${escapar(ins
 </html>`;
 }
 
-function extensaoDoAudio(blob) {
-  if (blob.type.includes('ogg')) return 'ogg';
-  if (blob.type.includes('mp4') || blob.type.includes('aac')) return 'm4a';
-  return 'webm';
-}
-
 export async function telaExportar(inspecaoId) {
   const inspecao = await obterInspecao(inspecaoId);
   if (!inspecao) {
@@ -106,8 +122,8 @@ export async function telaExportar(inspecaoId) {
 
   async function montarZip() {
     const zip = new JSZip();
-    const pastaFotos = zip.folder('fotos');
-    const pastaAudios = zip.folder('audios');
+    const pastaFotos = zip.folder('Fotos');
+    const pastasUsadas = new Set();
     const blocos = [];
     const dados = {
       aplicativo: `Continuidade de Aterramento v${VERSAO_APP}`,
@@ -119,29 +135,59 @@ export async function telaExportar(inspecaoId) {
 
     for (const equipamento of equipamentos) {
       const registro = await obterRegistro(inspecaoId, equipamento.id);
+      const setor = await obterSetor(equipamento.setorId);
       const fotos = await listarFotos(inspecaoId, equipamento.id);
       const audios = await listarAudios(inspecaoId, equipamento.id);
 
-      const fotosPorCategoria = {};
-      for (const foto of fotos) {
-        const nome = `equipamento-${equipamento.id}-${foto.categoria}-${foto.id}.jpg`;
-        pastaFotos.file(nome, foto.blob);
-        (fotosPorCategoria[foto.categoria] ??= []).push(nome);
+      // Pasta com o nome da máquina/equipamento como foi salvo no aplicativo.
+      let pasta = nomeSeguro(equipamento.nome) || `equipamento-${equipamento.id}`;
+      let sufixo = 2;
+      while (pastasUsadas.has(pasta.toLowerCase())) {
+        pasta = `${nomeSeguro(equipamento.nome)} (${sufixo})`;
+        sufixo += 1;
+      }
+      pastasUsadas.add(pasta.toLowerCase());
+      const pastaEquipamento = pastaFotos.folder(pasta);
+
+      // Fotos com nomes fixos: 01, 02, 03 e 04 a 14 (adicionais).
+      const arquivosFotos = {};
+      const unicas = { maquina: '01', valor: '02', prancheta: '03' };
+      let proximoAdicional = 4;
+      for (const foto of fotos.sort((a, b) => a.criadaEm - b.criadaEm)) {
+        let nome;
+        if (unicas[foto.categoria]) {
+          nome = `${unicas[foto.categoria]}.jpg`;
+          delete unicas[foto.categoria]; // limite de 1 por categoria
+        } else {
+          nome = `${String(proximoAdicional).padStart(2, '0')}.jpg`;
+          proximoAdicional += 1;
+        }
+        pastaEquipamento.file(nome, foto.blob);
+        (arquivosFotos[foto.categoria] ??= []).push(nome);
       }
 
-      const nomesAudios = [];
-      for (const audio of audios) {
-        const nome = `equipamento-${equipamento.id}-audio-${audio.id}.${extensaoDoAudio(audio.blob)}`;
-        pastaAudios.file(nome, audio.blob);
-        nomesAudios.push(nome);
+      // Áudios: "áudio", "áudio-2", …
+      const arquivosAudios = [];
+      audios.sort((a, b) => a.criadaEm - b.criadaEm).forEach((audio, indice) => {
+        const nome = `áudio${indice > 0 ? `-${indice + 1}` : ''}.${extensaoDoAudio(audio.blob)}`;
+        pastaEquipamento.file(nome, audio.blob);
+        arquivosAudios.push(nome);
+      });
+
+      // Observação: "observação.txt".
+      if (registro?.observacao) {
+        pastaEquipamento.file('observação.txt', registro.observacao);
       }
 
-      blocos.push({ equipamento, registro, fotosPorCategoria, nomesAudios });
+      const nomeSetor = setor?.nome ?? '';
+      blocos.push({ equipamento, nomeSetor, registro, pasta, arquivosFotos, arquivosAudios });
       dados.equipamentos.push({
         ...equipamento,
+        setor: nomeSetor,
+        pasta: `Fotos/${pasta}`,
         observacao: registro?.observacao ?? '',
-        fotos: fotosPorCategoria,
-        audios: nomesAudios,
+        fotos: arquivosFotos,
+        audios: arquivosAudios,
       });
     }
 
@@ -216,7 +262,9 @@ export async function telaExportar(inspecaoId) {
           el(
             'div',
             { class: 'detalhe' },
-            `Relatório em HTML, dados em JSON, fotos e áudios de ${totalEquipamentos} máquina(s)/equipamento(s).`
+            `Relatório em HTML, dados em JSON e a pasta "Fotos" com uma subpasta por ` +
+              `máquina/equipamento (${totalEquipamentos} no total), contendo as fotos ` +
+              `numeradas, os áudios e a observação.`
           )
         )
       ),

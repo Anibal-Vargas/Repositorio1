@@ -21,6 +21,33 @@ db.version(2).stores({
   inspetores: '++id, &nome',
 });
 
+// v3: o setor vira entidade própria (um setor agrupa várias máquinas/equipamentos).
+db.version(3)
+  .stores({
+    setores: '++id, clienteId, nome',
+    equipamentos: '++id, clienteId, setorId, nome',
+  })
+  .upgrade(async (tx) => {
+    // Migra o antigo campo de texto `setor` para a tabela de setores.
+    const equipamentos = await tx.table('equipamentos').toArray();
+    const mapa = new Map();
+    for (const equipamento of equipamentos) {
+      const nomeSetor = (equipamento.setor || '').trim();
+      if (!nomeSetor) continue;
+      const chave = `${equipamento.clienteId}|${nomeSetor.toLowerCase()}`;
+      let setorId = mapa.get(chave);
+      if (!setorId) {
+        setorId = await tx.table('setores').add({
+          clienteId: equipamento.clienteId,
+          nome: nomeSetor,
+          criadoEm: Date.now(),
+        });
+        mapa.set(chave, setorId);
+      }
+      await tx.table('equipamentos').update(equipamento.id, { setorId, setor: undefined });
+    }
+  });
+
 export const INSPETORES_PADRAO = [
   'Adauto Muller',
   'Aníbal Vargas',
@@ -30,11 +57,12 @@ export const INSPETORES_PADRAO = [
 ];
 
 // Categorias de foto do registro de cada máquina/equipamento.
+// Na exportação os arquivos recebem nomes fixos: 01, 02, 03 e 04 a 14 (adicionais).
 export const CATEGORIAS_FOTO = [
   { id: 'maquina', numero: '01', rotulo: 'Foto da máquina/equipamento', obrigatoria: true, limite: 1 },
   { id: 'valor', numero: '02', rotulo: 'Foto do valor medido', obrigatoria: true, limite: 1 },
   { id: 'prancheta', numero: '03', rotulo: 'Foto da prancheta', obrigatoria: false, limite: 1 },
-  { id: 'adicional', numero: '04', rotulo: 'Fotos adicionais', obrigatoria: false, limite: 10 },
+  { id: 'adicional', numero: '04', rotulo: 'Fotos adicionais', obrigatoria: false, limite: 11 },
 ];
 
 /* ---------------- Inspetores ---------------- */
@@ -69,21 +97,53 @@ export async function criarCliente(nome) {
   return db.clientes.add({ nome: nome.trim(), criadoEm: Date.now() });
 }
 
+/* ---------------- Setores ---------------- */
+
+export async function listarSetores(clienteId) {
+  const setores = await db.setores.where('clienteId').equals(Number(clienteId)).toArray();
+  return setores.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+export async function obterSetor(id) {
+  if (!id) return null;
+  return db.setores.get(Number(id));
+}
+
+// Cria o setor (ou devolve o existente com o mesmo nome no cliente).
+export async function criarSetor(clienteId, nome) {
+  const nomeLimpo = nome.trim();
+  const existente = (await listarSetores(clienteId)).find(
+    (setor) => setor.nome.toLowerCase() === nomeLimpo.toLowerCase()
+  );
+  if (existente) return existente.id;
+  return db.setores.add({ clienteId: Number(clienteId), nome: nomeLimpo, criadoEm: Date.now() });
+}
+
 /* ---------------- Máquinas/Equipamentos ---------------- */
 
-export async function listarEquipamentos(clienteId) {
-  return db.equipamentos.where('clienteId').equals(Number(clienteId)).sortBy('nome');
+export async function listarEquipamentosDoSetor(setorId) {
+  const equipamentos = await db.equipamentos.where('setorId').equals(Number(setorId)).toArray();
+  return equipamentos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true }));
 }
 
 export async function obterEquipamento(id) {
   return db.equipamentos.get(Number(id));
 }
 
-export async function criarEquipamento(clienteId, nome, setor = '') {
+// Cria a máquina/equipamento no setor, precedendo o nome com a numeração
+// sequencial do setor (mínimo dois dígitos): "01 - Nome".
+export async function criarEquipamento(clienteId, setorId, nome) {
+  const doSetor = await db.equipamentos.where('setorId').equals(Number(setorId)).toArray();
+  let maior = 0;
+  for (const equipamento of doSetor) {
+    const prefixo = equipamento.nome.match(/^(\d{2,})/);
+    if (prefixo) maior = Math.max(maior, Number(prefixo[1]));
+  }
+  const numero = String(maior + 1).padStart(2, '0');
   return db.equipamentos.add({
     clienteId: Number(clienteId),
-    nome: nome.trim(),
-    setor: setor.trim(),
+    setorId: Number(setorId),
+    nome: `${numero} - ${nome.trim()}`,
     criadoEm: Date.now(),
   });
 }

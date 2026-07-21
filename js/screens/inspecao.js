@@ -4,6 +4,7 @@ import { el, cabecalho, toast, formatarDataHora, debounce } from '../ui.js';
 import {
   obterInspecao,
   obterCliente,
+  obterSetor,
   atualizarInspecao,
   excluirInspecao,
   equipamentosDaInspecao,
@@ -24,6 +25,7 @@ export async function telaInspecao(inspecaoId) {
   const cartoesEquipamentos = [];
   for (const equipamento of equipamentos) {
     const resumo = await resumoDoEquipamento(inspecaoId, equipamento.id);
+    const setor = await obterSetor(equipamento.setorId);
     cartoesEquipamentos.push(
       el(
         'a',
@@ -35,7 +37,7 @@ export async function telaInspecao(inspecaoId) {
           el(
             'div',
             { class: 'detalhe' },
-            `${resumo.totalFotos} foto(s)` + (equipamento.setor ? ` · ${equipamento.setor}` : '')
+            `${resumo.totalFotos} foto(s)` + (setor ? ` · ${setor.nome}` : '')
           )
         ),
         resumo.completo

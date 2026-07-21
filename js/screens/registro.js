@@ -5,6 +5,7 @@ import { el, cabecalho, toast, debounce, formatarDataHora } from '../ui.js';
 import {
   obterInspecao,
   obterEquipamento,
+  obterSetor,
   obterRegistro,
   atualizarRegistro,
   removerEquipamentoDaInspecao,
@@ -46,6 +47,7 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     return [];
   }
   const somenteLeitura = inspecao.status === 'finalizada';
+  const setor = await obterSetor(equipamento.setorId);
   const fotos = await listarFotos(inspecaoId, equipamentoId);
   const audios = await listarAudios(inspecaoId, equipamentoId);
   const urlsCriadas = [];
@@ -262,7 +264,7 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
   return [
     cabecalho(equipamento.nome, {
       voltar: `#/inspecao/${inspecaoId}`,
-      subtitulo: equipamento.setor || 'Registro da medição',
+      subtitulo: setor ? `Setor: ${setor.nome}` : 'Registro da medição',
     }),
     el(
       'main',

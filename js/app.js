@@ -7,7 +7,7 @@ import { telaHome } from './screens/home.js';
 import { telaNovaInspecao } from './screens/novaInspecao.js';
 import { telaInspecoes } from './screens/inspecoes.js';
 import { telaInspecao } from './screens/inspecao.js';
-import { telaEscolherEquipamento } from './screens/escolherEquipamento.js';
+import { telaEscolherSetor, telaEquipamentosDoSetor } from './screens/escolherEquipamento.js';
 import { telaRegistro } from './screens/registro.js';
 import { telaExportar } from './screens/exportar.js';
 
@@ -19,7 +19,8 @@ const ROTAS = [
   { padrao: /^#\/nova-inspecao$/, tela: telaNovaInspecao },
   { padrao: /^#\/inspecoes$/, tela: telaInspecoes },
   { padrao: /^#\/inspecao\/(\d+)$/, tela: telaInspecao },
-  { padrao: /^#\/inspecao\/(\d+)\/equipamentos$/, tela: telaEscolherEquipamento },
+  { padrao: /^#\/inspecao\/(\d+)\/equipamentos$/, tela: telaEscolherSetor },
+  { padrao: /^#\/inspecao\/(\d+)\/setor\/(\d+)$/, tela: telaEquipamentosDoSetor },
   { padrao: /^#\/inspecao\/(\d+)\/equipamento\/(\d+)$/, tela: telaRegistro },
   { padrao: /^#\/inspecao\/(\d+)\/exportar$/, tela: telaExportar },
 ];
@@ -56,10 +57,17 @@ async function registrarServiceWorker() {
   try {
     const registro = await navigator.serviceWorker.register('sw.js');
 
-    // Quando um SW novo assume (skipWaiting + clients.claim),
-    // recarrega a página uma única vez e avisa o usuário.
+    // Quando um SW novo assume (skipWaiting + clients.claim) no lugar de um
+    // antigo, recarrega a página uma única vez e avisa o usuário. Na primeira
+    // instalação não há SW anterior — não recarrega, para não perder o que o
+    // usuário estiver digitando.
+    let haviaControlador = !!navigator.serviceWorker.controller;
     let recarregou = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!haviaControlador) {
+        haviaControlador = true;
+        return;
+      }
       if (recarregou || !navigator.serviceWorker.controller) return;
       recarregou = true;
       sessionStorage.setItem('avisoAtualizacao', '1');
