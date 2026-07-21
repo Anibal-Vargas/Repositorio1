@@ -129,7 +129,7 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
       campoNome.focus();
       return;
     }
-    const equipamentoId = await criarEquipamento(inspecao.clienteId, setorId, nome);
+    const equipamentoId = await criarEquipamento(inspecao.clienteId, setorId, nome, inspecaoId);
     toast('Máquina/equipamento criada.');
     await incluir(equipamentoId);
   }

@@ -131,11 +131,17 @@ export async function obterEquipamento(id) {
 }
 
 // Cria a máquina/equipamento no setor, precedendo o nome com a numeração
-// sequencial do setor (mínimo dois dígitos): "01 - Nome".
-export async function criarEquipamento(clienteId, setorId, nome) {
-  const doSetor = await db.equipamentos.where('setorId').equals(Number(setorId)).toArray();
+// sequencial (mínimo dois dígitos): "01 - Nome". A sequência é única por
+// inspeção e NÃO reinicia ao trocar de setor: se a inspeção já tem 01 e 02
+// num setor, a próxima máquina, em qualquer setor, recebe 03. As máquinas já
+// existentes no setor também entram no cálculo, para evitar números repetidos.
+export async function criarEquipamento(clienteId, setorId, nome, inspecaoId) {
+  const candidatas = [
+    ...(inspecaoId ? await equipamentosDaInspecao(inspecaoId) : []),
+    ...(await db.equipamentos.where('setorId').equals(Number(setorId)).toArray()),
+  ];
   let maior = 0;
-  for (const equipamento of doSetor) {
+  for (const equipamento of candidatas) {
     const prefixo = equipamento.nome.match(/^(\d{2,})/);
     if (prefixo) maior = Math.max(maior, Number(prefixo[1]));
   }
