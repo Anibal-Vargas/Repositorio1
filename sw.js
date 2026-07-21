@@ -1,6 +1,6 @@
 // Service Worker — cache completo para uso 100% offline.
 // Ao publicar uma atualização, incremente VERSAO aqui e VERSAO_APP em js/versao.js.
-const VERSAO = '1.0.0';
+const VERSAO = '1.1.0';
 const NOME_CACHE = `aterramento-nord-v${VERSAO}`;
 
 const ARQUIVOS = [
@@ -21,11 +21,8 @@ const ARQUIVOS = [
   'js/screens/inspecoes.js',
   'js/screens/inspecao.js',
   'js/screens/escolherEquipamento.js',
-  'js/screens/checklist.js',
-  'js/screens/fotos.js',
+  'js/screens/registro.js',
   'js/screens/exportar.js',
-  'js/screens/clientes.js',
-  'js/screens/cliente.js',
   'icons/logo-nord.png',
   'icons/icon-192.png',
   'icons/icon-512.png',

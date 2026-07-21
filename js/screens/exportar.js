@@ -1,4 +1,4 @@
-// Exportação da inspeção: pacote .zip com relatório HTML, dados JSON e fotos.
+// Exportação da inspeção: pacote .zip com relatório HTML, dados JSON, fotos e áudios.
 
 import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
 import { VERSAO_APP } from '../versao.js';
@@ -6,12 +6,11 @@ import {
   obterInspecao,
   obterCliente,
   equipamentosDaInspecao,
-  listarMedicoes,
+  obterRegistro,
   listarFotos,
-  LIMITE_OHMS,
+  listarAudios,
+  CATEGORIAS_FOTO,
 } from '../db.js';
-
-const ROTULOS = { conforme: 'Conforme', nc: 'Não conforme', na: 'N/A' };
 
 function escapar(texto) {
   return String(texto ?? '')
@@ -20,39 +19,36 @@ function escapar(texto) {
     .replaceAll('>', '&gt;');
 }
 
-function formatarOhms(valor) {
-  if (valor === '' || valor === null || valor === undefined) return '—';
-  return `${String(valor).replace('.', ',')} Ω`;
-}
-
 // Monta o relatório HTML autocontido (abre em qualquer navegador, imprime em A4).
 function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
-  const linhasEquipamentos = blocos
-    .map(({ equipamento, medicoes, nomesFotos }) => {
-      const linhas = medicoes
-        .map((medicao) => {
-          const classe =
-            medicao.resultado === 'nc' ? 'nc' : medicao.resultado === 'conforme' ? 'ok' : '';
-          return `<tr>
-            <td>${escapar(medicao.descricao)}</td>
-            <td>${medicao.temMedicao ? formatarOhms(medicao.valorOhms) : '—'}</td>
-            <td class="${classe}">${medicao.resultado ? ROTULOS[medicao.resultado] : 'Sem resposta'}</td>
-            <td>${escapar(medicao.observacao) || '—'}</td>
-          </tr>`;
-        })
-        .join('');
-      const fotosHtml = nomesFotos.length
-        ? `<div class="fotos">${nomesFotos
-            .map((nome) => `<img src="fotos/${nome}" alt="Foto">`)
-            .join('')}</div>`
+  const secoes = blocos
+    .map(({ equipamento, registro, fotosPorCategoria, nomesAudios }) => {
+      const grupos = CATEGORIAS_FOTO.map((categoria) => {
+        const nomes = fotosPorCategoria[categoria.id] || [];
+        if (nomes.length === 0) {
+          return categoria.obrigatoria
+            ? `<p class="pendente">${categoria.numero} · ${escapar(categoria.rotulo)}: <strong>sem foto (obrigatória)</strong></p>`
+            : '';
+        }
+        return `<h3>${categoria.numero} · ${escapar(categoria.rotulo)}</h3>
+          <div class="fotos">${nomes.map((nome) => `<img src="fotos/${nome}" alt="Foto">`).join('')}</div>`;
+      }).join('');
+
+      const audiosHtml = nomesAudios.length
+        ? `<h3>05 · Áudios</h3><ul>${nomesAudios
+            .map((nome) => `<li><a href="audios/${nome}">${nome}</a></li>`)
+            .join('')}</ul>`
         : '';
+
+      const observacaoHtml = registro?.observacao
+        ? `<h3>06 · Observação</h3><p>${escapar(registro.observacao)}</p>`
+        : '';
+
       return `<section>
         <h2>${escapar(equipamento.nome)}${equipamento.setor ? ` — ${escapar(equipamento.setor)}` : ''}</h2>
-        <table>
-          <thead><tr><th>Ponto de verificação</th><th>Valor medido</th><th>Resultado</th><th>Observação</th></tr></thead>
-          <tbody>${linhas}</tbody>
-        </table>
-        ${fotosHtml}
+        ${grupos}
+        ${audiosHtml}
+        ${observacaoHtml}
       </section>`;
     })
     .join('');
@@ -68,15 +64,12 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   h1 { font-size: 1.3rem; margin: 0 0 4px; }
   .meta { color: #6b7280; font-size: 0.9rem; }
   h2 { font-size: 1.05rem; border-left: 4px solid #f08019; padding-left: 8px; margin: 28px 0 8px; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
-  th { background: #fdf3e7; }
-  td.ok { color: #2e7d32; font-weight: 600; }
-  td.nc { color: #b3261e; font-weight: 600; }
-  .fotos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .fotos img { width: 160px; height: 160px; object-fit: cover; border: 1px solid #e5e7eb; border-radius: 8px; }
+  h3 { font-size: 0.9rem; color: #6b7280; margin: 14px 0 6px; }
+  .fotos { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fotos img { width: 200px; height: 200px; object-fit: cover; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .pendente { color: #b3261e; }
   footer { margin-top: 32px; color: #6b7280; font-size: 0.8rem; }
-  @media print { .fotos img { width: 120px; height: 120px; } }
+  @media print { .fotos img { width: 150px; height: 150px; } }
 </style>
 </head>
 <body>
@@ -85,16 +78,20 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   <div class="meta">
     Cliente: <strong>${escapar(cliente?.nome ?? '—')}</strong><br>
     Data da inspeção: ${escapar(formatarDataHora(inspecao.criadaEm))}<br>
-    Responsável: ${escapar(inspecao.responsavel) || '—'}<br>
-    Instrumento: ${escapar(inspecao.instrumento) || '—'}<br>
-    Limite referencial de continuidade: ${String(LIMITE_OHMS).replace('.', ',')} Ω
+    Inspetor: ${escapar(inspecao.inspetor || inspecao.responsavel) || '—'}
   </div>
 </header>
-${linhasEquipamentos}
+${secoes}
 ${inspecao.observacoes ? `<section><h2>Observações gerais</h2><p>${escapar(inspecao.observacoes)}</p></section>` : ''}
 <footer>Gerado pelo aplicativo Continuidade de Aterramento v${escapar(VERSAO_APP)} — Nord Consult Ltda.</footer>
 </body>
 </html>`;
+}
+
+function extensaoDoAudio(blob) {
+  if (blob.type.includes('ogg')) return 'ogg';
+  if (blob.type.includes('mp4') || blob.type.includes('aac')) return 'm4a';
+  return 'webm';
 }
 
 export async function telaExportar(inspecaoId) {
@@ -110,6 +107,7 @@ export async function telaExportar(inspecaoId) {
   async function montarZip() {
     const zip = new JSZip();
     const pastaFotos = zip.folder('fotos');
+    const pastaAudios = zip.folder('audios');
     const blocos = [];
     const dados = {
       aplicativo: `Continuidade de Aterramento v${VERSAO_APP}`,
@@ -120,16 +118,31 @@ export async function telaExportar(inspecaoId) {
     };
 
     for (const equipamento of equipamentos) {
-      const medicoes = await listarMedicoes(inspecaoId, equipamento.id);
+      const registro = await obterRegistro(inspecaoId, equipamento.id);
       const fotos = await listarFotos(inspecaoId, equipamento.id);
-      const nomesFotos = [];
+      const audios = await listarAudios(inspecaoId, equipamento.id);
+
+      const fotosPorCategoria = {};
       for (const foto of fotos) {
-        const nome = `equipamento-${equipamento.id}-foto-${foto.id}.jpg`;
+        const nome = `equipamento-${equipamento.id}-${foto.categoria}-${foto.id}.jpg`;
         pastaFotos.file(nome, foto.blob);
-        nomesFotos.push(nome);
+        (fotosPorCategoria[foto.categoria] ??= []).push(nome);
       }
-      blocos.push({ equipamento, medicoes, nomesFotos });
-      dados.equipamentos.push({ ...equipamento, medicoes, fotos: nomesFotos });
+
+      const nomesAudios = [];
+      for (const audio of audios) {
+        const nome = `equipamento-${equipamento.id}-audio-${audio.id}.${extensaoDoAudio(audio.blob)}`;
+        pastaAudios.file(nome, audio.blob);
+        nomesAudios.push(nome);
+      }
+
+      blocos.push({ equipamento, registro, fotosPorCategoria, nomesAudios });
+      dados.equipamentos.push({
+        ...equipamento,
+        observacao: registro?.observacao ?? '',
+        fotos: fotosPorCategoria,
+        audios: nomesAudios,
+      });
     }
 
     zip.file('relatorio.html', gerarRelatorioHtml({ inspecao, cliente, blocos }));
@@ -203,12 +216,12 @@ export async function telaExportar(inspecaoId) {
           el(
             'div',
             { class: 'detalhe' },
-            `Relatório em HTML, dados em JSON e fotos de ${totalEquipamentos} equipamento(s).`
+            `Relatório em HTML, dados em JSON, fotos e áudios de ${totalEquipamentos} máquina(s)/equipamento(s).`
           )
         )
       ),
       totalEquipamentos === 0
-        ? el('div', { class: 'vazio' }, 'A inspeção ainda não tem equipamentos.')
+        ? el('div', { class: 'vazio' }, 'A inspeção ainda não tem máquinas/equipamentos.')
         : null,
       el(
         'button',

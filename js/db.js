@@ -1,5 +1,5 @@
 // Camada de dados (Dexie / IndexedDB).
-// Entidades: Cliente → Máquina/Equipamento → Inspeção → Medições (checklist) → Fotos.
+// Entidades: Cliente → Máquina/Equipamento → Inspeção → Registro (fotos, áudios, observação).
 // Versionamento sempre aditivo: nunca alterar versões antigas já publicadas.
 
 const db = new Dexie('aterramento-nord');
@@ -12,18 +12,48 @@ db.version(1).stores({
   fotos: '++id, inspecaoId, equipamentoId, [inspecaoId+equipamentoId]',
 });
 
-// Checklist padrão de continuidade de aterramento aplicado a cada equipamento.
-// `temMedicao` indica pontos com valor medido em ohms (limite referencial 0,1 Ω).
-export const CHECKLIST_PADRAO = [
-  { descricao: 'Condutor de proteção (fio terra) presente e sem danos', temMedicao: false },
-  { descricao: 'Conexões de aterramento firmes e sem oxidação', temMedicao: false },
-  { descricao: 'Continuidade: carcaça da máquina ↔ barra de terra do painel', temMedicao: true },
-  { descricao: 'Continuidade: porta do painel ↔ estrutura do painel', temMedicao: true },
-  { descricao: 'Continuidade: motor ↔ barra de terra', temMedicao: true },
-  { descricao: 'Continuidade: partes metálicas expostas ↔ barra de terra', temMedicao: true },
+// v2: o checklist deu lugar ao registro fotográfico por máquina/equipamento
+// (fotos por categoria, áudios e observação) e à lista de inspetores.
+db.version(2).stores({
+  medicoes: null,
+  registros: '++id, inspecaoId, equipamentoId, [inspecaoId+equipamentoId]',
+  audios: '++id, inspecaoId, equipamentoId, [inspecaoId+equipamentoId]',
+  inspetores: '++id, &nome',
+});
+
+export const INSPETORES_PADRAO = [
+  'Adauto Muller',
+  'Aníbal Vargas',
+  'Hugo Araújo',
+  'Leonardo Oliveira',
+  'Thiago Lazzarin',
 ];
 
-export const LIMITE_OHMS = 0.1;
+// Categorias de foto do registro de cada máquina/equipamento.
+export const CATEGORIAS_FOTO = [
+  { id: 'maquina', numero: '01', rotulo: 'Foto da máquina/equipamento', obrigatoria: true, limite: 1 },
+  { id: 'valor', numero: '02', rotulo: 'Foto do valor medido', obrigatoria: true, limite: 1 },
+  { id: 'prancheta', numero: '03', rotulo: 'Foto da prancheta', obrigatoria: false, limite: 1 },
+  { id: 'adicional', numero: '04', rotulo: 'Fotos adicionais', obrigatoria: false, limite: 10 },
+];
+
+/* ---------------- Inspetores ---------------- */
+
+export async function listarInspetores() {
+  await db.inspetores
+    .bulkAdd(INSPETORES_PADRAO.map((nome) => ({ nome })))
+    .catch(() => {}); // nomes já existentes são ignorados (índice único)
+  return db.inspetores.orderBy('nome').toArray();
+}
+
+export async function criarInspetor(nome) {
+  try {
+    await db.inspetores.add({ nome: nome.trim() });
+  } catch {
+    /* nome já cadastrado */
+  }
+  return nome.trim();
+}
 
 /* ---------------- Clientes ---------------- */
 
@@ -39,22 +69,7 @@ export async function criarCliente(nome) {
   return db.clientes.add({ nome: nome.trim(), criadoEm: Date.now() });
 }
 
-export async function excluirCliente(id) {
-  const clienteId = Number(id);
-  const equipamentos = await db.equipamentos.where('clienteId').equals(clienteId).toArray();
-  const inspecoes = await db.inspecoes.where('clienteId').equals(clienteId).toArray();
-  await db.transaction('rw', db.clientes, db.equipamentos, db.inspecoes, db.medicoes, db.fotos, async () => {
-    for (const inspecao of inspecoes) {
-      await db.medicoes.where('inspecaoId').equals(inspecao.id).delete();
-      await db.fotos.where('inspecaoId').equals(inspecao.id).delete();
-    }
-    await db.inspecoes.where('clienteId').equals(clienteId).delete();
-    await db.equipamentos.bulkDelete(equipamentos.map((e) => e.id));
-    await db.clientes.delete(clienteId);
-  });
-}
-
-/* ---------------- Equipamentos ---------------- */
+/* ---------------- Máquinas/Equipamentos ---------------- */
 
 export async function listarEquipamentos(clienteId) {
   return db.equipamentos.where('clienteId').equals(Number(clienteId)).sortBy('nome');
@@ -73,19 +88,6 @@ export async function criarEquipamento(clienteId, nome, setor = '') {
   });
 }
 
-export async function atualizarEquipamento(id, mudancas) {
-  return db.equipamentos.update(Number(id), mudancas);
-}
-
-export async function excluirEquipamento(id) {
-  const equipamentoId = Number(id);
-  await db.transaction('rw', db.equipamentos, db.medicoes, db.fotos, async () => {
-    await db.medicoes.where('equipamentoId').equals(equipamentoId).delete();
-    await db.fotos.where('equipamentoId').equals(equipamentoId).delete();
-    await db.equipamentos.delete(equipamentoId);
-  });
-}
-
 /* ---------------- Inspeções ---------------- */
 
 export async function listarInspecoes() {
@@ -96,11 +98,10 @@ export async function obterInspecao(id) {
   return db.inspecoes.get(Number(id));
 }
 
-export async function criarInspecao(clienteId, responsavel = '', instrumento = '') {
+export async function criarInspecao(clienteId, inspetor = '') {
   return db.inspecoes.add({
     clienteId: Number(clienteId),
-    responsavel: responsavel.trim(),
-    instrumento: instrumento.trim(),
+    inspetor: inspetor.trim(),
     observacoes: '',
     status: 'em-andamento',
     criadaEm: Date.now(),
@@ -113,82 +114,63 @@ export async function atualizarInspecao(id, mudancas) {
 
 export async function excluirInspecao(id) {
   const inspecaoId = Number(id);
-  await db.transaction('rw', db.inspecoes, db.medicoes, db.fotos, async () => {
-    await db.medicoes.where('inspecaoId').equals(inspecaoId).delete();
+  await db.transaction('rw', db.inspecoes, db.registros, db.fotos, db.audios, async () => {
+    await db.registros.where('inspecaoId').equals(inspecaoId).delete();
     await db.fotos.where('inspecaoId').equals(inspecaoId).delete();
+    await db.audios.where('inspecaoId').equals(inspecaoId).delete();
     await db.inspecoes.delete(inspecaoId);
   });
 }
 
-/* ---------------- Medições (checklist por equipamento na inspeção) ---------------- */
+/* ---------------- Registros (máquina/equipamento na inspeção) ---------------- */
 
-// Lista os equipamentos já incluídos numa inspeção (ids distintos).
+// Lista as máquinas/equipamentos já incluídos numa inspeção.
 export async function equipamentosDaInspecao(inspecaoId) {
-  const medicoes = await db.medicoes.where('inspecaoId').equals(Number(inspecaoId)).toArray();
-  const ids = [...new Set(medicoes.map((m) => m.equipamentoId))];
-  const equipamentos = await db.equipamentos.bulkGet(ids);
+  const registros = await db.registros.where('inspecaoId').equals(Number(inspecaoId)).toArray();
+  const equipamentos = await db.equipamentos.bulkGet(registros.map((r) => r.equipamentoId));
   return equipamentos.filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
-// Inclui um equipamento na inspeção criando o checklist padrão (se ainda não existir).
+// Inclui uma máquina/equipamento na inspeção criando o registro (se ainda não existir).
 export async function incluirEquipamentoNaInspecao(inspecaoId, equipamentoId) {
-  const existentes = await db.medicoes
-    .where('[inspecaoId+equipamentoId]')
-    .equals([Number(inspecaoId), Number(equipamentoId)])
-    .count();
-  if (existentes > 0) return false;
-  await db.medicoes.bulkAdd(
-    CHECKLIST_PADRAO.map((item, ordem) => ({
-      inspecaoId: Number(inspecaoId),
-      equipamentoId: Number(equipamentoId),
-      ordem,
-      descricao: item.descricao,
-      temMedicao: item.temMedicao,
-      resultado: null, // 'conforme' | 'nc' | 'na'
-      valorOhms: '',
-      observacao: '',
-    }))
-  );
+  const existente = await obterRegistro(inspecaoId, equipamentoId);
+  if (existente) return false;
+  await db.registros.add({
+    inspecaoId: Number(inspecaoId),
+    equipamentoId: Number(equipamentoId),
+    observacao: '',
+    criadoEm: Date.now(),
+  });
   return true;
 }
 
-export async function listarMedicoes(inspecaoId, equipamentoId) {
-  const medicoes = await db.medicoes
+export async function obterRegistro(inspecaoId, equipamentoId) {
+  return db.registros
     .where('[inspecaoId+equipamentoId]')
     .equals([Number(inspecaoId), Number(equipamentoId)])
-    .toArray();
-  return medicoes.sort((a, b) => a.ordem - b.ordem);
+    .first();
 }
 
-export async function listarMedicoesDaInspecao(inspecaoId) {
-  return db.medicoes.where('inspecaoId').equals(Number(inspecaoId)).toArray();
-}
-
-export async function atualizarMedicao(id, mudancas) {
-  return db.medicoes.update(Number(id), mudancas);
+export async function atualizarRegistro(id, mudancas) {
+  return db.registros.update(Number(id), mudancas);
 }
 
 export async function removerEquipamentoDaInspecao(inspecaoId, equipamentoId) {
-  await db.transaction('rw', db.medicoes, db.fotos, async () => {
-    await db.medicoes
-      .where('[inspecaoId+equipamentoId]')
-      .equals([Number(inspecaoId), Number(equipamentoId)])
-      .delete();
-    await db.fotos
-      .where('[inspecaoId+equipamentoId]')
-      .equals([Number(inspecaoId), Number(equipamentoId)])
-      .delete();
+  const chave = [Number(inspecaoId), Number(equipamentoId)];
+  await db.transaction('rw', db.registros, db.fotos, db.audios, async () => {
+    await db.registros.where('[inspecaoId+equipamentoId]').equals(chave).delete();
+    await db.fotos.where('[inspecaoId+equipamentoId]').equals(chave).delete();
+    await db.audios.where('[inspecaoId+equipamentoId]').equals(chave).delete();
   });
 }
 
-// Resumo do checklist de um equipamento: { total, respondidas, nc }.
+// Resumo do registro: { completo, pendentes } com base nas fotos obrigatórias.
 export async function resumoDoEquipamento(inspecaoId, equipamentoId) {
-  const medicoes = await listarMedicoes(inspecaoId, equipamentoId);
-  return {
-    total: medicoes.length,
-    respondidas: medicoes.filter((m) => m.resultado !== null).length,
-    nc: medicoes.filter((m) => m.resultado === 'nc').length,
-  };
+  const fotos = await listarFotos(inspecaoId, equipamentoId);
+  const pendentes = CATEGORIAS_FOTO.filter(
+    (categoria) => categoria.obrigatoria && !fotos.some((f) => f.categoria === categoria.id)
+  ).map((categoria) => categoria.rotulo);
+  return { completo: pendentes.length === 0, pendentes, totalFotos: fotos.length };
 }
 
 /* ---------------- Fotos ---------------- */
@@ -204,10 +186,11 @@ export async function listarFotosDaInspecao(inspecaoId) {
   return db.fotos.where('inspecaoId').equals(Number(inspecaoId)).toArray();
 }
 
-export async function adicionarFoto(inspecaoId, equipamentoId, blob) {
+export async function adicionarFoto(inspecaoId, equipamentoId, categoria, blob) {
   return db.fotos.add({
     inspecaoId: Number(inspecaoId),
     equipamentoId: Number(equipamentoId),
+    categoria,
     blob,
     criadaEm: Date.now(),
   });
@@ -217,9 +200,24 @@ export async function excluirFoto(id) {
   return db.fotos.delete(Number(id));
 }
 
-export async function contarFotos(inspecaoId, equipamentoId) {
-  return db.fotos
+/* ---------------- Áudios ---------------- */
+
+export async function listarAudios(inspecaoId, equipamentoId) {
+  return db.audios
     .where('[inspecaoId+equipamentoId]')
     .equals([Number(inspecaoId), Number(equipamentoId)])
-    .count();
+    .toArray();
+}
+
+export async function adicionarAudio(inspecaoId, equipamentoId, blob) {
+  return db.audios.add({
+    inspecaoId: Number(inspecaoId),
+    equipamentoId: Number(equipamentoId),
+    blob,
+    criadaEm: Date.now(),
+  });
+}
+
+export async function excluirAudio(id) {
+  return db.audios.delete(Number(id));
 }

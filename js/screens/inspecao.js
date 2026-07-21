@@ -1,4 +1,4 @@
-// Detalhe da inspeção: dados gerais, equipamentos incluídos e exportação.
+// Detalhe da inspeção: dados gerais, máquinas/equipamentos incluídos e exportação.
 
 import { el, cabecalho, toast, formatarDataHora, debounce } from '../ui.js';
 import {
@@ -8,7 +8,6 @@ import {
   excluirInspecao,
   equipamentosDaInspecao,
   resumoDoEquipamento,
-  contarFotos,
 } from '../db.js';
 
 export async function telaInspecao(inspecaoId) {
@@ -25,7 +24,6 @@ export async function telaInspecao(inspecaoId) {
   const cartoesEquipamentos = [];
   for (const equipamento of equipamentos) {
     const resumo = await resumoDoEquipamento(inspecaoId, equipamento.id);
-    const fotos = await contarFotos(inspecaoId, equipamento.id);
     cartoesEquipamentos.push(
       el(
         'a',
@@ -37,14 +35,12 @@ export async function telaInspecao(inspecaoId) {
           el(
             'div',
             { class: 'detalhe' },
-            `${resumo.respondidas}/${resumo.total} itens · ${fotos} foto(s)` +
-              (equipamento.setor ? ` · ${equipamento.setor}` : '')
+            `${resumo.totalFotos} foto(s)` + (equipamento.setor ? ` · ${equipamento.setor}` : '')
           )
         ),
-        resumo.nc > 0 ? el('span', { class: 'selo selo-vermelho' }, `${resumo.nc} NC`) : null,
-        resumo.nc === 0 && resumo.respondidas === resumo.total && resumo.total > 0
+        resumo.completo
           ? el('span', { class: 'selo selo-verde' }, 'OK')
-          : null,
+          : el('span', { class: 'selo selo-vermelho' }, 'Pendente'),
         el('span', { class: 'seta' }, '›')
       )
     );
@@ -70,11 +66,11 @@ export async function telaInspecao(inspecaoId) {
       const pendentes = [];
       for (const equipamento of equipamentos) {
         const resumo = await resumoDoEquipamento(inspecaoId, equipamento.id);
-        if (resumo.respondidas < resumo.total) pendentes.push(equipamento.nome);
+        if (!resumo.completo) pendentes.push(`${equipamento.nome} (${resumo.pendentes.join(', ')})`);
       }
       let mensagem = 'Finalizar esta inspeção? Depois de finalizada ela fica somente leitura.';
       if (pendentes.length > 0) {
-        mensagem = `Ainda há itens sem resposta em: ${pendentes.join(', ')}. ${mensagem}`;
+        mensagem = `Faltam fotos obrigatórias em: ${pendentes.join('; ')}. ${mensagem}`;
       }
       if (!confirm(mensagem)) return;
       await atualizarInspecao(inspecaoId, { status: 'finalizada' });
@@ -89,7 +85,7 @@ export async function telaInspecao(inspecaoId) {
   async function excluir() {
     if (
       !confirm(
-        'Excluir esta inspeção? Todas as medições e fotos dela serão apagadas. Esta ação não pode ser desfeita.'
+        'Excluir esta inspeção? Todos os registros, fotos e áudios dela serão apagados. Esta ação não pode ser desfeita.'
       )
     )
       return;
@@ -98,24 +94,27 @@ export async function telaInspecao(inspecaoId) {
     location.hash = '#/inspecoes';
   }
 
+  const inspetor = inspecao.inspetor || inspecao.responsavel || '';
+
   return [
     cabecalho(cliente ? cliente.nome : 'Inspeção', {
       voltar: '#/inspecoes',
-      subtitulo: `Inspeção de ${formatarDataHora(inspecao.criadaEm)}` +
-        (inspecao.responsavel ? ` · ${inspecao.responsavel}` : ''),
+      subtitulo:
+        `Inspeção de ${formatarDataHora(inspecao.criadaEm)}` +
+        (inspetor ? ` · Inspetor: ${inspetor}` : ''),
     }),
     el(
       'main',
       { class: 'conteudo' },
-      el('h2', {}, 'Equipamentos'),
+      el('h2', {}, 'Máquinas/Equipamentos'),
       cartoesEquipamentos.length === 0
-        ? el('div', { class: 'vazio' }, 'Nenhum equipamento incluído ainda.')
+        ? el('div', { class: 'vazio' }, 'Nenhuma máquina/equipamento incluída ainda.')
         : el('div', { class: 'lista' }, cartoesEquipamentos),
       !finalizada
         ? el(
             'a',
             { class: 'btn btn-secundario', href: `#/inspecao/${inspecaoId}/equipamentos` },
-            '+ Adicionar equipamento'
+            '+ Adicionar máquina/equipamento'
           )
         : null,
       el('h2', {}, 'Observações'),

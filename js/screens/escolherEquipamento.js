@@ -1,4 +1,4 @@
-// Escolher (ou criar) um equipamento do cliente para incluir na inspeção.
+// Escolher (ou criar) uma máquina/equipamento do cliente para incluir na inspeção.
 
 import { el, cabecalho, toast } from '../ui.js';
 import {
@@ -21,13 +21,13 @@ export async function telaEscolherEquipamento(inspecaoId) {
 
   async function incluir(equipamentoId) {
     const incluiu = await incluirEquipamentoNaInspecao(inspecaoId, equipamentoId);
-    if (incluiu) toast('Equipamento incluído.');
+    if (incluiu) toast('Máquina/equipamento incluída.');
     location.hash = `#/inspecao/${inspecaoId}/equipamento/${equipamentoId}`;
   }
 
   const campoNome = el('input', {
     type: 'text',
-    placeholder: 'Nome/TAG do equipamento',
+    placeholder: 'Nome/TAG da máquina/equipamento',
     autocomplete: 'off',
   });
   const campoSetor = el('input', {
@@ -39,23 +39,27 @@ export async function telaEscolherEquipamento(inspecaoId) {
   async function criarEIncluir() {
     const nome = campoNome.value.trim();
     if (!nome) {
-      toast('Informe o nome do equipamento.');
+      toast('Informe o nome da máquina/equipamento.');
       campoNome.focus();
       return;
     }
     const equipamentoId = await criarEquipamento(inspecao.clienteId, nome, campoSetor.value);
-    toast('Equipamento criado.');
+    toast('Máquina/equipamento criada.');
     await incluir(equipamentoId);
   }
 
   return [
-    cabecalho('Escolher equipamento', { voltar: `#/inspecao/${inspecaoId}` }),
+    cabecalho('Escolher máquina/equipamento', { voltar: `#/inspecao/${inspecaoId}` }),
     el(
       'main',
       { class: 'conteudo' },
-      el('h2', {}, 'Equipamentos do cliente'),
+      el('h2', {}, 'Máquinas/Equipamentos do cliente'),
       equipamentos.length === 0
-        ? el('div', { class: 'vazio' }, 'Nenhum equipamento cadastrado. Crie o primeiro abaixo.')
+        ? el(
+            'div',
+            { class: 'vazio' },
+            'Nenhuma máquina/equipamento cadastrada. Crie a primeira abaixo.'
+          )
         : el(
             'div',
             { class: 'lista' },
@@ -76,7 +80,7 @@ export async function telaEscolherEquipamento(inspecaoId) {
               )
             )
           ),
-      el('h2', {}, 'Novo equipamento'),
+      el('h2', {}, 'Nova máquina/equipamento'),
       campoNome,
       el(
         'div',

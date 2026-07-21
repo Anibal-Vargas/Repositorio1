@@ -8,11 +8,8 @@ import { telaNovaInspecao } from './screens/novaInspecao.js';
 import { telaInspecoes } from './screens/inspecoes.js';
 import { telaInspecao } from './screens/inspecao.js';
 import { telaEscolherEquipamento } from './screens/escolherEquipamento.js';
-import { telaChecklist } from './screens/checklist.js';
-import { telaFotos } from './screens/fotos.js';
+import { telaRegistro } from './screens/registro.js';
 import { telaExportar } from './screens/exportar.js';
-import { telaClientes } from './screens/clientes.js';
-import { telaCliente } from './screens/cliente.js';
 
 // Cada rota mapeia uma regex do location.hash para uma função de tela.
 // Os grupos capturados viram parâmetros da função.
@@ -23,11 +20,8 @@ const ROTAS = [
   { padrao: /^#\/inspecoes$/, tela: telaInspecoes },
   { padrao: /^#\/inspecao\/(\d+)$/, tela: telaInspecao },
   { padrao: /^#\/inspecao\/(\d+)\/equipamentos$/, tela: telaEscolherEquipamento },
-  { padrao: /^#\/inspecao\/(\d+)\/equipamento\/(\d+)$/, tela: telaChecklist },
-  { padrao: /^#\/inspecao\/(\d+)\/equipamento\/(\d+)\/fotos$/, tela: telaFotos },
+  { padrao: /^#\/inspecao\/(\d+)\/equipamento\/(\d+)$/, tela: telaRegistro },
   { padrao: /^#\/inspecao\/(\d+)\/exportar$/, tela: telaExportar },
-  { padrao: /^#\/clientes$/, tela: telaClientes },
-  { padrao: /^#\/cliente\/(\d+)$/, tela: telaCliente },
 ];
 
 async function navegar() {

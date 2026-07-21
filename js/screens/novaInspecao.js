@@ -1,29 +1,56 @@
-// Nova inspeção: escolher (ou criar) o cliente e iniciar.
+// Nova inspeção: escolher o inspetor e o cliente (ou criar novos) e iniciar.
 
 import { el, cabecalho, toast } from '../ui.js';
-import { listarClientes, criarCliente, criarInspecao } from '../db.js';
+import {
+  listarInspetores,
+  criarInspetor,
+  listarClientes,
+  criarCliente,
+  criarInspecao,
+} from '../db.js';
 
 export async function telaNovaInspecao() {
+  const inspetores = await listarInspetores();
   const clientes = await listarClientes();
 
-  const campoResponsavel = el('input', {
+  const seletorInspetor = el(
+    'select',
+    {},
+    el('option', { value: '' }, 'Escolha o inspetor…'),
+    inspetores.map((inspetor) => el('option', { value: inspetor.nome }, inspetor.nome))
+  );
+
+  const campoNovoInspetor = el('input', {
     type: 'text',
-    placeholder: 'Nome do responsável pela medição',
-    autocomplete: 'off',
-  });
-  const campoInstrumento = el('input', {
-    type: 'text',
-    placeholder: 'Ex.: microohmímetro, nº de série',
+    placeholder: 'Nome do novo inspetor',
     autocomplete: 'off',
   });
 
+  async function adicionarInspetor() {
+    const nome = campoNovoInspetor.value.trim();
+    if (!nome) {
+      toast('Informe o nome do inspetor.');
+      campoNovoInspetor.focus();
+      return;
+    }
+    await criarInspetor(nome);
+    if (![...seletorInspetor.options].some((opcao) => opcao.value === nome)) {
+      seletorInspetor.append(el('option', { value: nome }, nome));
+    }
+    seletorInspetor.value = nome;
+    campoNovoInspetor.value = '';
+    toast('Inspetor incluído.');
+  }
+
   async function iniciar(clienteId) {
+    const inspetor = seletorInspetor.value;
+    if (!inspetor) {
+      toast('Escolha o inspetor.');
+      seletorInspetor.focus();
+      return;
+    }
     try {
-      const inspecaoId = await criarInspecao(
-        clienteId,
-        campoResponsavel.value,
-        campoInstrumento.value
-      );
+      const inspecaoId = await criarInspecao(clienteId, inspetor);
       toast('Inspeção criada.');
       location.hash = `#/inspecao/${inspecaoId}`;
     } catch {
@@ -44,6 +71,11 @@ export async function telaNovaInspecao() {
       campoNovoCliente.focus();
       return;
     }
+    if (!seletorInspetor.value) {
+      toast('Escolha o inspetor.');
+      seletorInspetor.focus();
+      return;
+    }
     const clienteId = await criarCliente(nome);
     toast('Cliente criado.');
     await iniciar(clienteId);
@@ -54,8 +86,14 @@ export async function telaNovaInspecao() {
     el(
       'main',
       { class: 'conteudo' },
-      el('label', {}, 'Responsável', campoResponsavel),
-      el('label', {}, 'Instrumento de medição', campoInstrumento),
+      el('h2', {}, 'Inspetor'),
+      seletorInspetor,
+      el(
+        'div',
+        { class: 'linha-form' },
+        campoNovoInspetor,
+        el('button', { class: 'btn btn-secundario', onclick: adicionarInspetor }, '+ Incluir')
+      ),
       el('h2', {}, 'Cliente'),
       clientes.length === 0
         ? el('div', { class: 'vazio' }, 'Nenhum cliente ainda. Crie o primeiro abaixo.')

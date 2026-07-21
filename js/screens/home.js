@@ -43,7 +43,6 @@ export async function telaHome() {
         'Inspeções',
         emAndamento > 0 ? el('span', { class: 'selo' }, String(emAndamento)) : null
       ),
-      el('a', { class: 'btn btn-secundario', href: '#/clientes' }, 'Clientes e equipamentos'),
       rodape
     ),
   ];
