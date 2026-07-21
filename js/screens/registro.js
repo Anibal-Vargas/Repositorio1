@@ -15,6 +15,7 @@ import {
   listarAudios,
   adicionarAudio,
   excluirAudio,
+  resumoDoEquipamento,
   CATEGORIAS_FOTO,
 } from '../db.js';
 
@@ -247,6 +248,25 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     registro.observacao || ''
   );
 
+  /* ---------- Concluir e voltar para as máquinas do setor ---------- */
+
+  // Ao concluir, o inspetor volta para a lista de máquinas do mesmo setor,
+  // pronto para registrar a próxima sem reescolher o setor.
+  const rotaDoSetor = setor
+    ? `#/inspecao/${inspecaoId}/setor/${setor.id}`
+    : `#/inspecao/${inspecaoId}`;
+
+  async function concluir() {
+    const resumo = await resumoDoEquipamento(inspecaoId, equipamentoId);
+    if (!resumo.completo) {
+      const continuar = confirm(
+        `Ainda faltam fotos obrigatórias: ${resumo.pendentes.join(', ')}. Concluir mesmo assim? A máquina ficará marcada como pendente.`
+      );
+      if (!continuar) return;
+    }
+    location.hash = rotaDoSetor;
+  }
+
   /* ---------- Remover da inspeção ---------- */
 
   async function removerDaInspecao() {
@@ -258,12 +278,12 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
       return;
     await removerEquipamentoDaInspecao(inspecaoId, equipamentoId);
     toast('Máquina/equipamento removida da inspeção.');
-    location.hash = `#/inspecao/${inspecaoId}`;
+    location.hash = rotaDoSetor;
   }
 
   return [
     cabecalho(equipamento.nome, {
-      voltar: `#/inspecao/${inspecaoId}`,
+      voltar: rotaDoSetor,
       subtitulo: setor ? `Setor: ${setor.nome}` : 'Registro da medição',
     }),
     el(
@@ -272,6 +292,11 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
       CATEGORIAS_FOTO.map(montarSecaoFotos),
       el('section', { class: 'secao-registro' }, el('h2', {}, '05 · Gravar áudio (opcional)'), listaAudios, !somenteLeitura ? botaoGravar : null),
       el('section', { class: 'secao-registro' }, el('h2', {}, '06 · Escrever observação (opcional)'), campoObservacao),
+      el(
+        'button',
+        { class: 'btn btn-primario btn-grande', onclick: concluir },
+        'Concluir esta máquina'
+      ),
       !somenteLeitura
         ? el(
             'button',

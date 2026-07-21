@@ -1,5 +1,6 @@
-// Inclusão de máquina/equipamento na inspeção em duas etapas:
-// 1) escolher (ou criar) o setor; 2) escolher (ou criar) a máquina/equipamento do setor.
+// Fluxo de campo da inspeção em duas etapas:
+// 1) escolher (ou criar) o setor; 2) registrar as máquinas/equipamentos do setor,
+// uma após a outra, sem precisar reescolher o setor.
 
 import { el, cabecalho, toast } from '../ui.js';
 import {
@@ -11,6 +12,7 @@ import {
   criarEquipamento,
   incluirEquipamentoNaInspecao,
   equipamentosDaInspecao,
+  resumoDoEquipamento,
 } from '../db.js';
 
 /* ---------- Etapa 1: escolher o setor ---------- */
@@ -23,6 +25,7 @@ export async function telaEscolherSetor(inspecaoId) {
     return [];
   }
   const setores = await listarSetores(inspecao.clienteId);
+  const registradas = new Set((await equipamentosDaInspecao(inspecaoId)).map((e) => e.id));
 
   const campoNome = el('input', {
     type: 'text',
@@ -44,7 +47,8 @@ export async function telaEscolherSetor(inspecaoId) {
 
   const cartoes = [];
   for (const setor of setores) {
-    const quantidade = (await listarEquipamentosDoSetor(setor.id)).length;
+    const equipamentos = await listarEquipamentosDoSetor(setor.id);
+    const nestaInspecao = equipamentos.filter((e) => registradas.has(e.id)).length;
     cartoes.push(
       el(
         'a',
@@ -53,7 +57,12 @@ export async function telaEscolherSetor(inspecaoId) {
           'div',
           { class: 'principal' },
           el('div', { class: 'titulo' }, setor.nome),
-          el('div', { class: 'detalhe' }, `${quantidade} máquina(s)/equipamento(s)`)
+          el(
+            'div',
+            { class: 'detalhe' },
+            `${equipamentos.length} máquina(s)/equipamento(s)` +
+              (nestaInspecao > 0 ? ` · ${nestaInspecao} nesta inspeção` : '')
+          )
         ),
         el('span', { class: 'seta' }, '›')
       )
@@ -77,12 +86,18 @@ export async function telaEscolherSetor(inspecaoId) {
         { class: 'linha-form' },
         campoNome,
         el('button', { class: 'btn btn-secundario', onclick: criarEAbrir }, '+ Criar')
+      ),
+      el('h2', {}, 'Terminou os setores?'),
+      el(
+        'a',
+        { class: 'btn btn-primario', href: `#/inspecao/${inspecaoId}` },
+        'Revisar e exportar inspeção'
       )
     ),
   ];
 }
 
-/* ---------- Etapa 2: escolher a máquina/equipamento do setor ---------- */
+/* ---------- Etapa 2: registrar as máquinas/equipamentos do setor ---------- */
 
 export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
   const inspecao = await obterInspecao(inspecaoId);
@@ -119,10 +134,32 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
     await incluir(equipamentoId);
   }
 
+  // Cada máquina mostra o andamento do registro nesta inspeção:
+  // OK (fotos obrigatórias completas), Pendente (incluída, faltam fotos) ou nada.
+  const cartoes = [];
+  for (const equipamento of equipamentos) {
+    let selo = null;
+    if (jaIncluidos.has(equipamento.id)) {
+      const resumo = await resumoDoEquipamento(inspecaoId, equipamento.id);
+      selo = resumo.completo
+        ? el('span', { class: 'selo selo-verde' }, 'OK')
+        : el('span', { class: 'selo selo-vermelho' }, 'Pendente');
+    }
+    cartoes.push(
+      el(
+        'button',
+        { class: 'cartao', onclick: () => incluir(equipamento.id) },
+        el('div', { class: 'principal' }, el('div', { class: 'titulo' }, equipamento.nome)),
+        selo,
+        el('span', { class: 'seta' }, '›')
+      )
+    );
+  }
+
   return [
     cabecalho(setor.nome, {
       voltar: `#/inspecao/${inspecaoId}/equipamentos`,
-      subtitulo: 'Escolher máquina/equipamento',
+      subtitulo: 'Registre as máquinas/equipamentos deste setor, uma após a outra',
     }),
     el(
       'main',
@@ -134,31 +171,19 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
             { class: 'vazio' },
             'Nenhuma máquina/equipamento cadastrada neste setor. Crie a primeira abaixo.'
           )
-        : el(
-            'div',
-            { class: 'lista' },
-            equipamentos.map((equipamento) =>
-              el(
-                'button',
-                { class: 'cartao', onclick: () => incluir(equipamento.id) },
-                el(
-                  'div',
-                  { class: 'principal' },
-                  el('div', { class: 'titulo' }, equipamento.nome)
-                ),
-                jaIncluidos.has(equipamento.id)
-                  ? el('span', { class: 'selo selo-verde' }, 'Na inspeção')
-                  : null,
-                el('span', { class: 'seta' }, '›')
-              )
-            )
-          ),
+        : el('div', { class: 'lista' }, cartoes),
       el('h2', {}, 'Nova máquina/equipamento'),
       el(
         'div',
         { class: 'linha-form' },
         campoNome,
         el('button', { class: 'btn btn-secundario', onclick: criarEIncluir }, '+ Criar')
+      ),
+      el('h2', {}, 'Terminou este setor?'),
+      el(
+        'a',
+        { class: 'btn btn-primario', href: `#/inspecao/${inspecaoId}/equipamentos` },
+        'Concluir setor'
       )
     ),
   ];

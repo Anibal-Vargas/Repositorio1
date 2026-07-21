@@ -52,7 +52,8 @@ export async function telaNovaInspecao() {
     try {
       const inspecaoId = await criarInspecao(clienteId, inspetor);
       toast('Inspeção criada.');
-      location.hash = `#/inspecao/${inspecaoId}`;
+      // Vai direto para a escolha do setor — o fluxo de campo começa aqui.
+      location.hash = `#/inspecao/${inspecaoId}/equipamentos`;
     } catch {
       toast('Erro ao criar a inspeção.');
     }
