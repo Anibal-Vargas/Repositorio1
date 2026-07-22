@@ -3,5 +3,9 @@ __pycache__/
 build/
 dist/
 *.spec
-exemplos/*.zip
 saida/
+scratch_ocr/
+# Pacotes de inspeção reais (grandes e com dados/fotos do cliente):
+exemplos/
+*.rar
+*.zip
