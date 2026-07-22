@@ -47,6 +47,7 @@ desktop/
   aterramento/            pacote Python
     modelo.py             estruturas de dados (Cliente, Inspecao, Equipamento…)
     leitor.py             lerPacote(): .zip -> modelo de dados
+    planilha.py           gerarPlanilhaResumo(): .xlsx a partir do modelo
     logo-nord.png         marca para os documentos
   conferir.py             CLI de conferência da leitura (Etapa 1)
   ferramentas/
@@ -69,7 +70,10 @@ pendentes) e a lista de máquinas por setor, com as pendências.
 ## Roadmap por etapas
 
 - [x] **Etapa 1 — Leitor do pacote** (`.zip` → modelo de dados + conferência).
-- [ ] **Etapa 2 — Planilha resumo** (`.xlsx`) a partir do modelo do cliente.
+- [x] **Etapa 2 — Planilha resumo** (`.xlsx`) — clona o modelo e preenche
+  cabeçalho (Local/Data) e uma linha por máquina, preservando fórmulas
+  (efetiva/adequado) e a formatação condicional. Valor medido e prolongador
+  entram como parâmetros (origem definida nas próximas etapas).
 - [ ] **Etapa 3 — Laudo geral** (`.docx`/`.pdf`) a partir do modelo.
 - [ ] **Etapa 4 — Laudo individual** por máquina (`.docx`/`.pdf`).
 - [ ] **Etapa 5 — Gravação na pasta de rede** + estrutura de saída.
