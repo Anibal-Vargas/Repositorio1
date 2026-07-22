@@ -88,7 +88,7 @@ def gerarPlanilhaResumo(
 
     for i, e in enumerate(equipamentos):
         r = LINHA_DADOS_INICIO + i
-        med = medicoes.get(e.id, {}) if e.id is not None else {}
+        med = medicoes.get(e.chave, {})
         valor = med.get("valor")
         prolongador = med.get("prolongador", prolongador_padrao)
 

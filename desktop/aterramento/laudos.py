@@ -12,6 +12,7 @@ medições e os dados por máquina vêm da inspeção.
 
 from __future__ import annotations
 
+import io
 import os
 
 import docx
@@ -140,3 +141,142 @@ def gerarLaudoGeral(
     os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
     doc.save(caminho_saida)
     return caminho_saida
+
+
+def _nome_arquivo_seguro(texto: str) -> str:
+    return texto.replace("/", "-").replace("\\", "-").replace(":", "-").strip()
+
+
+# --- Laudo Individual -----------------------------------------------------
+
+LIMITE_ADEQUADO = 1000.0  # mΩ (efetiva ≤ 1000 -> ESTÁ / adequado)
+
+
+def _preparar_imagem(caminho: str, formato: str, max_lado: int = 1200, q: int = 85):
+    """Redimensiona e reencoda a foto no formato do placeholder. Devolve
+    (bytes, (largura, altura))."""
+    from PIL import Image
+
+    im = Image.open(caminho).convert("RGB")
+    w, h = im.size
+    if max(w, h) > max_lado:
+        f = max_lado / max(w, h)
+        im = im.resize((max(1, int(w * f)), max(1, int(h * f))))
+    buf = io.BytesIO()
+    im.save(buf, "PNG" if formato == "png" else "JPEG", quality=q)
+    return buf.getvalue(), im.size
+
+
+def _trocar_imagem(doc, inline_shape, caminho_foto: str) -> None:
+    """Substitui a imagem de um inline shape pela foto, preservando a largura
+    do placeholder e ajustando a altura para manter o aspecto."""
+    rId = inline_shape._inline.graphic.graphicData.pic.blipFill.blip.embed
+    parte = doc.part.related_parts[rId]
+    formato = "png" if "png" in (parte.content_type or "") else "jpeg"
+    blob, (w, h) = _preparar_imagem(caminho_foto, formato)
+    parte._blob = blob
+    larg = inline_shape.width
+    inline_shape.height = int(larg * h / w)
+
+
+def gerarLaudoIndividual(
+    equipamento: Equipamento,
+    config: Configuracao,
+    data_medicoes,
+    valor_medido: float,
+    caminho_saida: str,
+    prolongador: float | None = None,
+    modelo: str | None = None,
+) -> str:
+    """Gera o laudo individual (.docx) de uma máquina preenchendo o modelo.
+
+    ``valor_medido`` em mΩ (informado/confirmado pelo operador). ``prolongador``
+    em mΩ; se None, usa o do equipamento ou o padrão da configuração.
+    """
+    doc = docx.Document(modelo or MODELO_INDIVIDUAL)
+    if prolongador is None:
+        prolongador = (
+            equipamento.prolongador
+            if equipamento.prolongador is not None
+            else config.prolongador_padrao
+        )
+    efetiva = valor_medido - prolongador
+    adequado = efetiva <= LIMITE_ADEQUADO
+    data_ext = data_por_extenso(data_medicoes)
+    nome_upper = equipamento.nome.upper()
+
+    subs = {
+        # Capa
+        "COOPERATIVA CENTRAL – INCUBATÓRIO IBIAÇÁ - RS": config.capa_ind_unidade,
+        "INCUBATÓRIO IBIAÇÁ - RS": config.capa_ind_local,
+        "INCUBADORA 48": nome_upper,
+        "Chapecó – SC, 09 de março de 2026": f"{config.cidade}, {data_ext}",
+        # Engenheiro
+        "Aníbal Rosa Vargas": config.engenheiro,
+        "CREA-SC – 069788-5": f"CREA-SC – {config.crea}",
+    }
+    # Linhas de MEDIÇÃO: resolve a string exata do modelo por prefixo (o modelo
+    # usa o sinal de ohm U+2126, então reaproveitamos o caractere do próprio
+    # texto em vez de digitá-lo).
+    medicao = {
+        "Valor medido = ": _fmt(valor_medido),
+        "Resistência elétrica do cabo prolongador PT = ": _fmt(prolongador),
+        "Resistência elétrica de aterramento efetiva = ": _fmt(efetiva),
+    }
+    for p in doc.paragraphs:
+        for prefixo, valor in medicao.items():
+            if p.text.startswith(prefixo):
+                antigo = p.text
+                ohm = antigo[-1]  # 'Ω' (U+2126) tal como no modelo
+                subs[antigo] = f"{prefixo}{valor}m{ohm}"
+    if not adequado:
+        subs["conclui-se que o equipamento  ESTÁ  solidamente conectado"] = (
+            "conclui-se que o equipamento  NÃO ESTÁ  solidamente conectado"
+        )
+    _aplicar_substituicoes(doc, subs)
+
+    # Troca as duas fotos variáveis (as duas últimas imagens do modelo):
+    # penúltima = equipamento (foto 01), última = valor medido (foto 02).
+    imagens = doc.inline_shapes
+    foto_maquina = equipamento.fotos_maquina[0] if equipamento.fotos_maquina else None
+    foto_valor = equipamento.fotos_valor[0] if equipamento.fotos_valor else None
+    if len(imagens) >= 2:
+        if foto_maquina and os.path.exists(foto_maquina):
+            _trocar_imagem(doc, imagens[-2], foto_maquina)
+        if foto_valor and os.path.exists(foto_valor):
+            _trocar_imagem(doc, imagens[-1], foto_valor)
+
+    os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
+    doc.save(caminho_saida)
+    return caminho_saida
+
+
+def gerarLaudosIndividuais(
+    pacote: Pacote,
+    config: Configuracao,
+    data_medicoes,
+    medicoes: dict,
+    pasta_saida: str,
+) -> list[str]:
+    """Gera um laudo individual (.docx) por máquina que tenha valor medido.
+
+    ``medicoes``: ``{id_equipamento: {"valor": float, "prolongador": float|None}}``.
+    Máquinas sem valor medido informado são puladas (não há como preencher a
+    seção de medição). Devolve a lista de caminhos gerados.
+    """
+    os.makedirs(pasta_saida, exist_ok=True)
+    gerados = []
+    for eq in pacote.equipamentos:
+        med = medicoes.get(eq.chave, {})
+        valor = med.get("valor")
+        if valor is None:
+            continue
+        nome = _nome_arquivo_seguro(eq.nome) or f"equipamento-{eq.chave}"
+        caminho = os.path.join(pasta_saida, f"Laudo - {nome}.docx")
+        gerarLaudoIndividual(
+            eq, config, data_medicoes, valor, caminho,
+            prolongador=med.get("prolongador"),
+        )
+        gerados.append(caminho)
+    return gerados
+

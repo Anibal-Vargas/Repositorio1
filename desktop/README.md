@@ -38,15 +38,17 @@ relatorio.html              ← referência de layout
 dados.json                  ← dados estruturados (pode vir VAZIO)
 ```
 
-O leitor usa `dados.json` quando presente e válido; **como no export real ele
-pode vir vazio**, a fonte efetiva costuma ser a varredura das pastas `Fotos/`
-(lendo `resultado.txt`, `setor.txt`, `prolongador.txt`, `observação.txt` e a
-numeração das fotos). O valor decimal do prolongador vem em pt-BR (`0,2`).
+O leitor usa `dados.json` como fonte principal (traz cliente, inspetor, data,
+setor, resultado, observação e a relação de fotos). O `prolongador` **não** está
+no `dados.json` — vem sempre do `prolongador.txt` de cada pasta (decimal pt-BR,
+`0,2`). Se o `dados.json` estiver ausente/ inválido, o leitor cai para a
+varredura das pastas `Fotos/` (`resultado.txt`, `setor.txt`, `prolongador.txt`,
+`observação.txt`).
 
 O **valor medido (mΩ)** NÃO está no pacote: será lido da foto `02` por OCR (com
-revisão) ou digitado no app. Dados do cabeçalho do laudo (cliente, data,
-inspetor, contratante, nº da proposta) também não estão no pacote e vêm do
-formulário do app.
+revisão) ou digitado no app. Já os dados fixos do laudo que não vêm no pacote
+(contratante, nº da proposta, cidade, engenheiro) vêm da **configuração**
+preenchida uma vez.
 
 Uma máquina é **OK** apenas com as fotos 01 e 02 e o resultado marcado; caso
 contrário é **Pendente** (sinalizado nos relatórios).
@@ -95,7 +97,12 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   o modelo substituindo os campos variáveis (contratante, proposta, cidade,
   data, engenheiro) vindos da `Configuracao` (preenchida uma vez) + data da
   inspeção, preservando figuras, metodologia, normas e os dados fixos da Nord.
-- [ ] **Etapa 4 — Laudo individual** por máquina (`.docx`/`.pdf`).
+- [x] **Etapa 4 — Laudo individual** por máquina (`.docx`):
+  `laudos.gerarLaudoIndividual()` / `gerarLaudosIndividuais()` preenchem o
+  modelo com valor medido / prolongador / resistência efetiva, definem a
+  conclusão **ESTÁ / NÃO ESTÁ** pela efetiva (≤ 1000 mΩ) e **inserem as fotos**
+  01 (equipamento) e 02 (valor), preservando as figuras fixas. Um arquivo por
+  máquina.
 - [ ] **Etapa 5 — Gravação na pasta de rede** + estrutura de saída.
 - [ ] **Etapa 6 — Empacotamento `.exe`** (Windows) + conversão para PDF.
 

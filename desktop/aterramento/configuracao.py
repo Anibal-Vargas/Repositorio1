@@ -36,6 +36,10 @@ class Configuracao:
     capa_linha_unidade: str = "UNIDADE CATARINENSE – INCUBATÓRIO"
     capa_linha_local: str = "IBIACÁ - RS"
 
+    # Capa do laudo individual.
+    capa_ind_local: str = "INCUBATÓRIO IBIAÇÁ - RS"          # linha do título
+    capa_ind_unidade: str = "COOPERATIVA CENTRAL – INCUBATÓRIO IBIAÇÁ - RS"  # "UNIDADE: ..."
+
     # Proposta e cidade (para a capa "<cidade>, <data por extenso>").
     proposta: str = "018PC26AUR"
     cidade: str = "Chapecó - SC"

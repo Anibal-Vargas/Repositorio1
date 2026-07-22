@@ -52,6 +52,15 @@ class Equipamento:
     # --- Propriedades derivadas -------------------------------------------
 
     @property
+    def chave(self) -> object:
+        """Chave estável do equipamento: ``id`` quando existir, senão o nome.
+
+        Usada para casar os valores medidos (informados no app) com a máquina,
+        já que no export real o ``dados.json`` vem vazio e ``id`` é None.
+        """
+        return self.id if self.id is not None else self.nome
+
+    @property
     def numero(self) -> int | None:
         """Número sequencial extraído do prefixo "NN - " do nome, se houver."""
         m = re.match(r"\s*(\d+)\s*-\s*", self.nome)
