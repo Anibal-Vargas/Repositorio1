@@ -1,0 +1,11 @@
+# Dependências do app desktop de relatórios de aterramento (Windows).
+# A Etapa 1 (leitor) roda só com a biblioteca padrão; Pillow é opcional
+# (melhora as imagens do pacote de exemplo). As demais entram nas próximas
+# etapas (geração de documentos e empacotamento).
+
+Pillow>=10.0        # imagens (exemplo, redimensionamento p/ laudos)
+openpyxl>=3.1       # planilha resumo (.xlsx) a partir do modelo  [Etapa 2]
+python-docx>=1.1    # laudos (.docx) a partir dos modelos          [Etapas 3-4]
+docxtpl>=0.17       # preenchimento de modelos .docx com placeholders (opcional)
+# docx2pdf>=0.1.8   # conversão .docx -> .pdf via MS Word (Windows) [Etapa 6]
+# pyinstaller>=6.0  # empacotamento em .exe                          [Etapa 6]
