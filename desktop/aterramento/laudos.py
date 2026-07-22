@@ -135,8 +135,13 @@ def gerarLaudoGeral(
         "Chapecó - SC, 09 de março de 2026": f"{config.cidade}, {data_ext}",
         # Datas das medições
         "09/03/2026": data_curta,
+        # (f) Certificado de calibração — data e validade
+        "Aferição 20/03/2025 e validade da medição de 01 ano":
+            f"Aferição {config.calibracao_data} e validade do certificado até "
+            f"{config.calibracao_validade}",
     }
     _aplicar_substituicoes(doc, subs)
+    _aplicar_imagens_config(doc, config)  # (d)(e) logo, equipamento, selo
 
     os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
     doc.save(caminho_saida)
@@ -179,6 +184,49 @@ def _trocar_imagem(doc, inline_shape, caminho_foto: str) -> None:
     inline_shape.height = int(larg * h / w)
 
 
+def _blob_encaixado(caminho_novo: str, blob_original: bytes, formato: str) -> bytes:
+    """Encaixa a nova imagem na proporção da original (padding), evitando
+    distorção ao manter o mesmo tamanho de exibição do modelo."""
+    from PIL import Image
+
+    orig = Image.open(io.BytesIO(blob_original))
+    aw, ah = orig.size
+    nova = Image.open(caminho_novo).convert("RGBA")
+    nova.thumbnail((aw, ah), Image.LANCZOS)
+    fundo = (0, 0, 0, 0) if formato == "png" else (255, 255, 255, 255)
+    canvas = Image.new("RGBA", (aw, ah), fundo)
+    canvas.paste(nova, ((aw - nova.width) // 2, (ah - nova.height) // 2), nova)
+    buf = io.BytesIO()
+    if formato == "png":
+        canvas.save(buf, "PNG")
+    else:
+        canvas.convert("RGB").save(buf, "JPEG", quality=88)
+    return buf.getvalue()
+
+
+def _substituir_parte_imagem(doc, nome_parte: str, caminho_novo: str) -> bool:
+    """Substitui o conteúdo da parte de imagem ``/word/media/<nome_parte>`` —
+    atualiza todas as referências (capa e cabeçalhos compartilham a parte)."""
+    alvo = f"/word/media/{nome_parte}"
+    for part in doc.part.package.iter_parts():
+        if str(part.partname) == alvo:
+            formato = "png" if nome_parte.lower().endswith(".png") else "jpeg"
+            part._blob = _blob_encaixado(caminho_novo, part.blob, formato)
+            return True
+    return False
+
+
+def _aplicar_imagens_config(doc, config: Configuracao) -> None:
+    """(d)(e) Substitui logo do cliente, imagem do equipamento e selo de
+    calibração pelas imagens fornecidas na configuração (quando informadas)."""
+    if config.logo_cliente and os.path.exists(config.logo_cliente):
+        _substituir_parte_imagem(doc, "image1.png", config.logo_cliente)
+    if config.imagem_equipamento and os.path.exists(config.imagem_equipamento):
+        _substituir_parte_imagem(doc, "image2.jpeg", config.imagem_equipamento)
+    if config.imagem_selo_calibracao and os.path.exists(config.imagem_selo_calibracao):
+        _substituir_parte_imagem(doc, "image3.png", config.imagem_selo_calibracao)
+
+
 def gerarLaudoIndividual(
     equipamento: Equipamento,
     config: Configuracao,
@@ -203,7 +251,8 @@ def gerarLaudoIndividual(
     efetiva = valor_medido - prolongador
     adequado = efetiva <= LIMITE_ADEQUADO
     data_ext = data_por_extenso(data_medicoes)
-    nome_upper = equipamento.nome.upper()
+    # (a) Na capa, o nome do equipamento vai SEM o prefixo numérico "NN - ".
+    nome_upper = equipamento.nome_sem_numero.upper()
 
     subs = {
         # Capa
@@ -214,6 +263,10 @@ def gerarLaudoIndividual(
         # Engenheiro
         "Aníbal Rosa Vargas": config.engenheiro,
         "CREA-SC – 069788-5": f"CREA-SC – {config.crea}",
+        # (f) Certificado de calibração — data e validade
+        "certificado de calibração pelo fabricante na data 20/03/2025":
+            f"certificado de calibração pelo fabricante na data "
+            f"{config.calibracao_data}, com validade até {config.calibracao_validade}",
     }
     # Linhas de MEDIÇÃO: resolve a string exata do modelo por prefixo (o modelo
     # usa o sinal de ohm U+2126, então reaproveitamos o caractere do próprio
@@ -229,6 +282,17 @@ def gerarLaudoIndividual(
                 antigo = p.text
                 ohm = antigo[-1]  # 'Ω' (U+2126) tal como no modelo
                 subs[antigo] = f"{prefixo}{valor}m{ohm}"
+
+    # (b)(c) Corrige as legendas das figuras (troca de descrição entre Fig. 2 e 3),
+    # preservando o traço/espaçamento do próprio modelo.
+    import re
+    for p in doc.paragraphs:
+        m2 = re.match(r"(Figura\s*2\s*[–-]\s*)", p.text)
+        m3 = re.match(r"(Figura\s*3\s*[–-]\s*)", p.text)
+        if m2:
+            subs[p.text] = m2.group(1) + "Registro ensaio continuidade no equipamento"
+        elif m3:
+            subs[p.text] = m3.group(1) + "Resultado medição"
     if not adequado:
         subs["conclui-se que o equipamento  ESTÁ  solidamente conectado"] = (
             "conclui-se que o equipamento  NÃO ESTÁ  solidamente conectado"
@@ -245,6 +309,8 @@ def gerarLaudoIndividual(
             _trocar_imagem(doc, imagens[-2], foto_maquina)
         if foto_valor and os.path.exists(foto_valor):
             _trocar_imagem(doc, imagens[-1], foto_valor)
+
+    _aplicar_imagens_config(doc, config)  # (d)(e) logo, equipamento, selo
 
     os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
     doc.save(caminho_saida)

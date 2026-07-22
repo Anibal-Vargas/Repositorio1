@@ -44,6 +44,16 @@ class Configuracao:
     proposta: str = "018PC26AUR"
     cidade: str = "Chapecó - SC"
 
+    # Imagens fornecidas pelo usuário no início (caminhos de arquivo). Vazio =
+    # mantém a imagem do modelo.
+    logo_cliente: str = ""            # (d) logomarca do cliente (capa e cabeçalhos)
+    imagem_equipamento: str = ""      # (e) foto do miliohmímetro (Figura 1)
+    imagem_selo_calibracao: str = ""  # (e) selo/certificado de calibração
+
+    # (f) Datas do certificado de calibração.
+    calibracao_data: str = "20/03/2025"       # data de aferição/emissão
+    calibracao_validade: str = "20/03/2026"   # validade do certificado
+
     # Resistência do prolongador padrão (mΩ) quando o pacote não trouxer.
     prolongador_padrao: float = 0.2
 

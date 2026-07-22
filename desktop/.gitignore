@@ -5,6 +5,8 @@ dist/
 *.spec
 saida/
 scratch_ocr/
+scratch_docx/
+scratch_img/
 # Pacotes de inspeção reais (grandes e com dados/fotos do cliente):
 exemplos/
 *.rar
