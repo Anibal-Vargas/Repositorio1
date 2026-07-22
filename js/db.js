@@ -146,10 +146,13 @@ export async function criarEquipamento(clienteId, setorId, nome, inspecaoId) {
     if (prefixo) maior = Math.max(maior, Number(prefixo[1]));
   }
   const numero = String(maior + 1).padStart(2, '0');
+  // Primeira letra sempre maiúscula, mesmo que o usuário digite em minúsculo.
+  const nomeLimpo = nome.trim();
+  const nomeFormatado = nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1);
   return db.equipamentos.add({
     clienteId: Number(clienteId),
     setorId: Number(setorId),
-    nome: `${numero} - ${nome.trim()}`,
+    nome: `${numero} - ${nomeFormatado}`,
     criadoEm: Date.now(),
   });
 }
