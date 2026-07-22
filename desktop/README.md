@@ -91,7 +91,10 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   **experimental** — funciona nas fotos nítidas, mas precisa de um lote de
   fotos reais para calibrar; por isso a leitura é sempre *sugestão* e passa
   por confirmação do operador (nunca auto-aceita).
-- [ ] **Etapa 3 — Laudo geral** (`.docx`/`.pdf`) a partir do modelo.
+- [x] **Etapa 3 — Laudo geral** (`.docx`): `laudos.gerarLaudoGeral()` preenche
+  o modelo substituindo os campos variáveis (contratante, proposta, cidade,
+  data, engenheiro) vindos da `Configuracao` (preenchida uma vez) + data da
+  inspeção, preservando figuras, metodologia, normas e os dados fixos da Nord.
 - [ ] **Etapa 4 — Laudo individual** por máquina (`.docx`/`.pdf`).
 - [ ] **Etapa 5 — Gravação na pasta de rede** + estrutura de saída.
 - [ ] **Etapa 6 — Empacotamento `.exe`** (Windows) + conversão para PDF.
