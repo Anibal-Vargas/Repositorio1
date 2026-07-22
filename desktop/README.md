@@ -60,14 +60,37 @@ desktop/
   aterramento/            pacote Python
     modelo.py             estruturas de dados (Cliente, Inspecao, Equipamento…)
     leitor.py             lerPacote(): .zip -> modelo de dados
+    ocr.py                localização/leitura do display (foto 02)
+    configuracao.py       dados fixos preenchidos uma vez (JSON)
     planilha.py           gerarPlanilhaResumo(): .xlsx a partir do modelo
-    logo-nord.png         marca para os documentos
+    laudos.py             gerarLaudoGeral() / gerarLaudosIndividuais(): .docx
+    geracao.py            gerar_todos(): orquestra tudo numa pasta
+    app.py                interface Tkinter
+  iniciar_app.py          lançador do app (python iniciar_app.py)
   conferir.py             CLI de conferência da leitura (Etapa 1)
   ferramentas/
     gerar_exemplo.py      gera um .zip de exemplo para testes
-  modelos/                (a preencher) modelos .xlsx/.docx do cliente
+  modelos/                modelos .xlsx/.docx do cliente
   requirements.txt
 ```
+
+**Dependências:** `pip install -r requirements.txt`. O `tkinter` acompanha o
+Python no Windows (no Linux: `apt install python3-tk`).
+
+## Como usar o app
+
+```bash
+cd desktop
+python iniciar_app.py
+```
+
+1. **Configuração** (uma vez): preencha contratante, proposta, cidade,
+   engenheiro, as **imagens** (logo do cliente, equipamento, selo de calibração)
+   e as datas da calibração. Fica salvo em `~/.aterramento/config.json`.
+2. **Abrir pacote (.zip)** da inspeção. Confira cliente/inspetor/data e, por
+   máquina, veja o **display ampliado** e informe/confirme o **valor medido**.
+3. **Gerar documentos** e escolha a pasta (pode ser a pasta de rede). Saem a
+   planilha, o laudo geral e os laudos individuais organizados em subpasta.
 
 ## Como testar a leitura (Etapa 1)
 
@@ -103,8 +126,18 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   conclusão **ESTÁ / NÃO ESTÁ** pela efetiva (≤ 1000 mΩ) e **inserem as fotos**
   01 (equipamento) e 02 (valor), preservando as figuras fixas. Um arquivo por
   máquina.
-- [ ] **Etapa 5 — Gravação na pasta de rede** + estrutura de saída.
-- [ ] **Etapa 6 — Empacotamento `.exe`** (Windows) + conversão para PDF.
+- [x] **Etapa 5 — Gravação na pasta escolhida** + estrutura de saída:
+  `geracao.gerar_todos()` monta, numa subpasta `<cliente> - <data>`, a planilha
+  resumo, o laudo geral e os laudos individuais (em `Laudos Individuais/`). A
+  pasta de destino é escolhida pelo operador a cada inspeção (inclusive pasta
+  de rede mapeada).
+- [x] **Etapa 6a — Tela do app (Tkinter)**: `aterramento/app.py` — configuração
+  (dados fixos + imagens: logo, equipamento, selo, datas de calibração),
+  abertura do `.zip`, cabeçalho editável, e por máquina o display ampliado +
+  valor medido (confirmável) com prolongador/resultado pré-preenchidos; gera e
+  salva na pasta escolhida. Rodar com `python iniciar_app.py`.
+- [ ] **Etapa 6b — PDF + empacotamento `.exe`** (Windows): conversão
+  `.docx → .pdf` (Word/LibreOffice) e geração do executável (PyInstaller).
 
 > Para as Etapas 2–4 são necessários os **modelos** do cliente
 > (planilha resumo, laudo geral, laudo individual). Coloque-os em
