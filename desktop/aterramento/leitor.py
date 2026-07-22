@@ -41,6 +41,17 @@ def _texto(caminho: str) -> str:
         return ""
 
 
+def _num_ptbr(texto: str) -> float | None:
+    """Converte número em formato pt-BR ("0,2") para float. None se vazio."""
+    if not texto:
+        return None
+    t = texto.strip().replace(".", "").replace(",", ".")
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
 def _rotulo_resultado(texto: str | None) -> str | None:
     """Normaliza o resultado para o rótulo padrão dos relatórios."""
     if not texto:
@@ -161,14 +172,22 @@ def _ler_de_dados_json(diretorio: str, dados: dict) -> Pacote:
     for eq in dados.get("equipamentos", []):
         pasta_rel = eq.get("pasta", "")
         pasta_abs = _pasta_absoluta(diretorio, pasta_rel)
+        # Campos que podem estar só nos .txt das pastas (o dados.json às vezes
+        # não os traz): setor, prolongador e observação.
+        setor = eq.get("setor") or _texto(os.path.join(pasta_abs, "setor.txt"))
+        prolongador = _num_ptbr(_texto(os.path.join(pasta_abs, "prolongador.txt")))
+        observacao = eq.get("observacao") or _texto(
+            os.path.join(pasta_abs, "observação.txt")
+        )
         equipamentos.append(
             Equipamento(
                 id=eq.get("id"),
                 nome=eq.get("nome", ""),
-                setor=eq.get("setor", ""),
+                setor=setor,
                 pasta=pasta_rel,
                 resultado_medicao=_rotulo_resultado(eq.get("resultadoMedicao")),
-                observacao=eq.get("observacao", ""),
+                observacao=observacao,
+                prolongador=prolongador,
                 fotos=_resolver_fotos(pasta_abs, eq.get("fotos")),
                 audios=_resolver_audios(pasta_abs, eq.get("audios")),
             )
@@ -196,12 +215,16 @@ def _ler_de_pastas(diretorio: str) -> Pacote:
                 continue
             resultado = _rotulo_resultado(_texto(os.path.join(pasta_abs, "resultado.txt")))
             observacao = _texto(os.path.join(pasta_abs, "observação.txt"))
+            setor = _texto(os.path.join(pasta_abs, "setor.txt"))
+            prolongador = _num_ptbr(_texto(os.path.join(pasta_abs, "prolongador.txt")))
             equipamentos.append(
                 Equipamento(
                     nome=nome_pasta,
+                    setor=setor,
                     pasta=f"Fotos/{nome_pasta}",
                     resultado_medicao=resultado,
                     observacao=observacao,
+                    prolongador=prolongador,
                     fotos=_resolver_fotos(pasta_abs, None),
                     audios=_resolver_audios(pasta_abs, None),
                 )
@@ -229,14 +252,45 @@ def lerPacote(caminho_zip: str, destino: str | None = None) -> Pacote:
 
     diretorio = destino or tempfile.mkdtemp(prefix="aterramento-")
     _extrair(caminho_zip, diretorio)
+    return lerPasta(diretorio)
 
-    caminho_dados = os.path.join(diretorio, "dados.json")
-    if os.path.exists(caminho_dados):
-        with open(caminho_dados, encoding="utf-8") as f:
-            dados = json.load(f)
-        return _ler_de_dados_json(diretorio, dados)
 
-    return _ler_de_pastas(diretorio)
+def _raiz_do_pacote(diretorio: str) -> str:
+    """Localiza a raiz real do pacote (onde ficam Fotos/ e dados.json).
+
+    Alguns pacotes vêm com tudo dentro de uma subpasta (ex.: "Inspeção/").
+    """
+    if os.path.isdir(os.path.join(diretorio, "Fotos")) or os.path.exists(
+        os.path.join(diretorio, "dados.json")
+    ):
+        return diretorio
+    itens = [i for i in os.listdir(diretorio) if not i.startswith(".")]
+    subpastas = [i for i in itens if os.path.isdir(os.path.join(diretorio, i))]
+    if len(subpastas) == 1:
+        candidato = os.path.join(diretorio, subpastas[0])
+        if os.path.isdir(os.path.join(candidato, "Fotos")):
+            return candidato
+    return diretorio
+
+
+def lerPasta(diretorio: str) -> Pacote:
+    """Lê um pacote já extraído em ``diretorio`` e devolve o :class:`Pacote`.
+
+    Usa ``dados.json`` quando presente e válido; caso contrário (inclusive
+    quando o arquivo está vazio), cai para a varredura das pastas ``Fotos/``.
+    """
+    raiz = _raiz_do_pacote(diretorio)
+    caminho_dados = os.path.join(raiz, "dados.json")
+    if os.path.exists(caminho_dados) and os.path.getsize(caminho_dados) > 0:
+        try:
+            with open(caminho_dados, encoding="utf-8") as f:
+                dados = json.load(f)
+            pacote = _ler_de_dados_json(raiz, dados)
+            if pacote.equipamentos:
+                return pacote
+        except (json.JSONDecodeError, OSError):
+            pass  # dados.json inválido -> varredura das pastas
+    return _ler_de_pastas(raiz)
 
 
 def limparPacote(pacote: Pacote) -> None:

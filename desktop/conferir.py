@@ -10,17 +10,20 @@ validar a leitura ANTES de gerar qualquer documento.
 
 from __future__ import annotations
 
+import os
 import sys
 
-from aterramento import lerPacote, limparPacote
+from aterramento import lerPacote, lerPasta, limparPacote
 
 
 def _linha(texto: str = "", nivel: int = 0) -> None:
     print("  " * nivel + texto)
 
 
-def conferir(caminho_zip: str) -> None:
-    pacote = lerPacote(caminho_zip)
+def conferir(caminho: str) -> None:
+    # Aceita tanto um .zip quanto uma pasta já extraída.
+    pacote = lerPasta(caminho) if os.path.isdir(caminho) else lerPacote(caminho)
+    limpar = not os.path.isdir(caminho)
     try:
         _linha("=" * 68)
         _linha("Medição de continuidade de aterramento elétrico de máquinas e")
@@ -56,6 +59,8 @@ def conferir(caminho_zip: str) -> None:
                     f"(total {n_fotos})",
                     2,
                 )
+                if e.prolongador is not None:
+                    _linha(f"prolongador (PT): {e.prolongador} mΩ", 2)
                 if e.audios:
                     _linha(f"áudios: {len(e.audios)}", 2)
                 if e.observacao:
@@ -68,11 +73,12 @@ def conferir(caminho_zip: str) -> None:
             _linha("⚠  ATENÇÃO: há máquinas pendentes (itens obrigatórios faltando).")
             _linha("   Os relatórios sinalizarão essas pendências.")
     finally:
-        limparPacote(pacote)
+        if limpar:
+            limparPacote(pacote)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Uso: python conferir.py caminho/para/pacote.zip")
+        print("Uso: python conferir.py caminho/para/pacote.zip  (ou pasta extraída)")
         sys.exit(1)
     conferir(sys.argv[1])

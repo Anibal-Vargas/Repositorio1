@@ -24,21 +24,32 @@ Os documentos são gravados numa **pasta de rede mapeada/compartilhada**
 
 ```
 Fotos/
-  <nome da máquina>/        ← ex.: "01 - Prensa hidráulica PH-01" (UTF-8)
+  <nome da máquina>/        ← ex.: "01 - Compressor 01" (UTF-8)
     01.jpg                  ← foto da máquina (obrigatória)
     02.jpg                  ← foto do valor medido (obrigatória)
     03.jpg                  ← foto da prancheta (opcional)
     04.jpg … 14.jpg         ← fotos adicionais (opcionais)
     resultado.txt           ← "conforme" | "não conforme"
-    áudio.webm              ← opcional (.webm/.ogg/.m4a)
+    setor.txt               ← nome do setor (ex.: "Sala de máquinas")
+    prolongador.txt         ← resistência do prolongador em mΩ (ex.: "0,2")
     observação.txt          ← opcional
+    áudio.webm              ← opcional (.webm/.ogg/.m4a)
 relatorio.html              ← referência de layout
-dados.json                  ← fonte estruturada preferencial
+dados.json                  ← dados estruturados (pode vir VAZIO)
 ```
 
-O leitor usa `dados.json` como fonte principal e as pastas `Fotos/` para
-localizar imagens/áudios. Uma máquina é **OK** apenas com as fotos 01 e 02 e o
-resultado marcado; caso contrário é **Pendente** (sinalizado nos relatórios).
+O leitor usa `dados.json` quando presente e válido; **como no export real ele
+pode vir vazio**, a fonte efetiva costuma ser a varredura das pastas `Fotos/`
+(lendo `resultado.txt`, `setor.txt`, `prolongador.txt`, `observação.txt` e a
+numeração das fotos). O valor decimal do prolongador vem em pt-BR (`0,2`).
+
+O **valor medido (mΩ)** NÃO está no pacote: será lido da foto `02` por OCR (com
+revisão) ou digitado no app. Dados do cabeçalho do laudo (cliente, data,
+inspetor, contratante, nº da proposta) também não estão no pacote e vêm do
+formulário do app.
+
+Uma máquina é **OK** apenas com as fotos 01 e 02 e o resultado marcado; caso
+contrário é **Pendente** (sinalizado nos relatórios).
 
 ## Estrutura do projeto
 

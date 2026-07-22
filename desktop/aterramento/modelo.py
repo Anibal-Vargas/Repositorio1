@@ -40,6 +40,10 @@ class Equipamento:
     pasta: str = ""            # caminho dentro do zip, ex.: "Fotos/01 - Prensa..."
     resultado_medicao: str | None = None  # "Conforme" | "Não conforme" | None
     observacao: str = ""
+    # Resistência do prolongador (PT), em mΩ, vinda de prolongador.txt.
+    prolongador: float | None = None
+    # Valor medido (mΩ), preenchido por OCR/digitação (não vem do pacote).
+    valor_medido: float | None = None
     # Fotos por categoria -> caminhos absolutos no disco (após extração).
     fotos: dict[str, list[str]] = field(default_factory=dict)
     # Áudios -> caminhos absolutos no disco.
