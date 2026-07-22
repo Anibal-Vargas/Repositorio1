@@ -65,6 +65,9 @@ export const CATEGORIAS_FOTO = [
   { id: 'adicional', numero: '04', rotulo: 'Fotos adicionais', obrigatoria: false, limite: 11 },
 ];
 
+// Valor predefinido do campo "Resistência do prolongador" (obrigatório).
+export const PROLONGADOR_PADRAO = '0,2';
+
 /* ---------------- Inspetores ---------------- */
 
 export async function listarInspetores() {
@@ -208,6 +211,7 @@ export async function incluirEquipamentoNaInspecao(inspecaoId, equipamentoId) {
     inspecaoId: Number(inspecaoId),
     equipamentoId: Number(equipamentoId),
     observacao: '',
+    prolongador: PROLONGADOR_PADRAO, // resistência do prolongador (valor predefinido)
     criadoEm: Date.now(),
   });
   return true;
@@ -242,6 +246,7 @@ export async function resumoDoEquipamento(inspecaoId, equipamentoId) {
   ).map((categoria) => categoria.rotulo);
   const registro = await obterRegistro(inspecaoId, equipamentoId);
   if (!registro?.resultado) pendentes.push('Resultado da medição (conforme/não conforme)');
+  if (!registro?.prolongador?.trim()) pendentes.push('Resistência do prolongador');
   return { completo: pendentes.length === 0, pendentes, totalFotos: fotos.length };
 }
 

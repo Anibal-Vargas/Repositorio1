@@ -53,6 +53,9 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
       const resultadoHtml = resultado
         ? `<p class="resultado ${registro.resultado === 'nc' ? 'nc' : 'ok'}">Resultado da medição: <strong>${resultado}</strong></p>`
         : '';
+      const prolongadorHtml = registro?.prolongador
+        ? `<p class="prolongador">Resistência do prolongador: <strong>${escapar(registro.prolongador)} Ω</strong></p>`
+        : '';
 
       const grupos = CATEGORIAS_FOTO.map((categoria) => {
         const nomes = arquivosFotos[categoria.id] || [];
@@ -67,8 +70,9 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
             .map((nome) => `<img src="${caminhoUrl('Fotos', pasta, nome)}" alt="Foto">`)
             .join('')}</div>`;
         }
-        // O resultado da medição aparece logo após a foto do valor medido (02).
-        if (categoria.id === 'valor') bloco += resultadoHtml;
+        // O resultado da medição e a resistência do prolongador aparecem logo
+        // após a foto do valor medido (02).
+        if (categoria.id === 'valor') bloco += resultadoHtml + prolongadorHtml;
         return bloco;
       }).join('');
 
@@ -109,6 +113,7 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   .resultado { font-size: 0.95rem; margin: 10px 0; }
   .resultado.ok { color: #2e7d32; }
   .resultado.nc { color: #b3261e; }
+  .prolongador { font-size: 0.95rem; margin: 10px 0; }
   footer { margin-top: 32px; color: #6b7280; font-size: 0.8rem; }
   @media print { .fotos img { width: 150px; height: 150px; } }
 </style>
@@ -199,18 +204,30 @@ export async function telaExportar(inspecaoId) {
         pastaEquipamento.file('resultado.txt', rotulo.toLowerCase());
       }
 
+      // Resistência do prolongador: "prolongador.txt".
+      if (registro?.prolongador) {
+        pastaEquipamento.file('prolongador.txt', registro.prolongador);
+      }
+
+      const nomeSetor = setor?.nome ?? '';
+
+      // Setor da máquina/equipamento: "setor.txt".
+      if (nomeSetor) {
+        pastaEquipamento.file('setor.txt', nomeSetor);
+      }
+
       // Observação: "observação.txt".
       if (registro?.observacao) {
         pastaEquipamento.file('observação.txt', registro.observacao);
       }
 
-      const nomeSetor = setor?.nome ?? '';
       blocos.push({ equipamento, nomeSetor, registro, pasta, arquivosFotos, arquivosAudios });
       dados.equipamentos.push({
         ...equipamento,
         setor: nomeSetor,
         pasta: `Fotos/${pasta}`,
         resultadoMedicao: rotuloResultado(registro?.resultado),
+        resistenciaProlongador: registro?.prolongador ?? '',
         observacao: registro?.observacao ?? '',
         fotos: arquivosFotos,
         audios: arquivosAudios,

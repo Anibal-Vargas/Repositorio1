@@ -17,6 +17,7 @@ import {
   excluirAudio,
   resumoDoEquipamento,
   CATEGORIAS_FOTO,
+  PROLONGADOR_PADRAO,
 } from '../db.js';
 
 // Reduz a foto para no máximo `ladoMaximo` px no lado maior (JPEG), poupando espaço.
@@ -48,6 +49,11 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     return [];
   }
   const somenteLeitura = inspecao.status === 'finalizada';
+  // Garante o valor predefinido do prolongador em registros antigos (sem o campo).
+  if (registro.prolongador == null) {
+    registro.prolongador = PROLONGADOR_PADRAO;
+    if (!somenteLeitura) await atualizarRegistro(registro.id, { prolongador: PROLONGADOR_PADRAO });
+  }
   const setor = await obterSetor(equipamento.setorId);
   const fotos = await listarFotos(inspecaoId, equipamentoId);
   const audios = await listarAudios(inspecaoId, equipamentoId);
@@ -196,12 +202,45 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     );
   }
 
-  // Monta as seções de foto em ordem, inserindo o resultado da medição
-  // logo após a "Foto do valor medido" (categoria 02).
+  /* ---------- Resistência do prolongador (obrigatório, predefinido 0,2) ---------- */
+
+  function montarProlongador() {
+    const salvar = debounce(async (valor) => {
+      await atualizarRegistro(registro.id, { prolongador: valor });
+      toast('Salvo.');
+    }, 500);
+
+    const campo = el('input', {
+      type: 'text',
+      inputmode: 'decimal',
+      placeholder: PROLONGADOR_PADRAO,
+      value: registro.prolongador ?? PROLONGADOR_PADRAO,
+      disabled: somenteLeitura,
+      oninput: (evento) => salvar(evento.target.value),
+    });
+
+    return el(
+      'section',
+      { class: 'secao-registro' },
+      el('h2', {}, 'Resistência do prolongador'),
+      el(
+        'div',
+        { class: 'item-checklist' },
+        el('div', { class: 'descricao' }, 'Informe a resistência do prolongador (obrigatória)'),
+        el('div', { class: 'campo-medicao' }, campo, el('span', { class: 'unidade' }, 'Ω'))
+      )
+    );
+  }
+
+  // Monta as seções de foto em ordem, inserindo o resultado da medição e a
+  // resistência do prolongador logo após a "Foto do valor medido" (categoria 02).
   const secoesFotos = [];
   for (const categoria of CATEGORIAS_FOTO) {
     secoesFotos.push(montarSecaoFotos(categoria));
-    if (categoria.id === 'valor') secoesFotos.push(montarResultado());
+    if (categoria.id === 'valor') {
+      secoesFotos.push(montarResultado());
+      secoesFotos.push(montarProlongador());
+    }
   }
 
   /* ---------- Áudios ---------- */

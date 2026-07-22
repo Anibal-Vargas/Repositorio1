@@ -1,2 +1,2 @@
 // Versão do aplicativo — manter espelhada com a constante VERSAO em sw.js.
-export const VERSAO_APP = '1.8.0';
+export const VERSAO_APP = '1.9.0';
