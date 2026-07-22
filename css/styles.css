@@ -281,6 +281,53 @@ h2 {
   padding: 1rem 0;
 }
 
+/* Item de lista com edição inline (renomear/excluir) */
+.linha-cartao {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.linha-cartao .cartao {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-editar {
+  flex: 0 0 auto;
+  width: 46px;
+  min-height: 44px;
+  background: var(--branco);
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  color: var(--cinza);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.btn-editar:active {
+  background: var(--laranja-suave);
+  border-color: var(--laranja);
+}
+
+.editor-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.7rem;
+  border: 1.5px dashed var(--borda);
+  border-radius: var(--raio);
+}
+
+.editor-inline input {
+  flex: 1 1 100%;
+}
+
+.editor-inline .btn {
+  flex: 1;
+}
+
 /* ============================================================
    Formulários
    ============================================================ */

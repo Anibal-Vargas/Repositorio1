@@ -1,11 +1,12 @@
 // Nova inspeção: escolher o inspetor e o cliente (ou criar novos) e iniciar.
 
-import { el, cabecalho, toast } from '../ui.js';
+import { el, cabecalho, toast, cartaoEditavel } from '../ui.js';
 import {
   listarInspetores,
   criarInspetor,
   listarClientes,
   criarCliente,
+  renomearCliente,
   criarInspecao,
 } from '../db.js';
 
@@ -102,12 +103,13 @@ export async function telaNovaInspecao() {
             'div',
             { class: 'lista' },
             clientes.map((cliente) =>
-              el(
-                'button',
-                { class: 'cartao', onclick: () => iniciar(cliente.id) },
-                el('div', { class: 'principal' }, el('div', { class: 'titulo' }, cliente.nome)),
-                el('span', { class: 'seta' }, '›')
-              )
+              cartaoEditavel({
+                onSelecionar: () => iniciar(cliente.id),
+                titulo: cliente.nome,
+                valorEditavel: cliente.nome,
+                aoRenomear: (novo) => renomearCliente(cliente.id, novo).then(() => novo),
+                // Cliente pode ser renomeado, mas não excluído nesta tela.
+              })
             )
           ),
       el(

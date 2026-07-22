@@ -66,7 +66,22 @@ export const CATEGORIAS_FOTO = [
 ];
 
 // Valor predefinido do campo "Resistência do prolongador" (obrigatório).
-export const PROLONGADOR_PADRAO = '0,2';
+export const PROLONGADOR_PADRAO = '0,8';
+
+// Converte o texto do valor medido em número. Vírgula é o separador decimal
+// (pt-BR); pontos são tratados como separador de milhar. Ignora unidades/texto.
+export function numeroDoValor(texto) {
+  if (texto === null || texto === undefined) return NaN;
+  let s = String(texto).replace(/[^\d.,-]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  return parseFloat(s);
+}
+
+// Regra de conformidade do valor medido: acima de 1000 é "NÃO CONFORME".
+export function conformidadeDoValor(valorMedido) {
+  if (!String(valorMedido ?? '').trim()) return null;
+  return numeroDoValor(valorMedido) > 1000 ? 'NÃO CONFORME' : 'CONFORME';
+}
 
 /* ---------------- Inspetores ---------------- */
 
@@ -100,6 +115,10 @@ export async function criarCliente(nome) {
   return db.clientes.add({ nome: nome.trim(), criadoEm: Date.now() });
 }
 
+export async function renomearCliente(id, nome) {
+  return db.clientes.update(Number(id), { nome: nome.trim() });
+}
+
 /* ---------------- Setores ---------------- */
 
 export async function listarSetores(clienteId) {
@@ -120,6 +139,21 @@ export async function criarSetor(clienteId, nome) {
   );
   if (existente) return existente.id;
   return db.setores.add({ clienteId: Number(clienteId), nome: nomeLimpo, criadoEm: Date.now() });
+}
+
+export async function renomearSetor(id, nome) {
+  return db.setores.update(Number(id), { nome: nome.trim() });
+}
+
+// Exclui o setor e, em cascata, suas máquinas/equipamentos e todos os
+// registros, fotos e áudios delas (em qualquer inspeção).
+export async function excluirSetor(id) {
+  const setorId = Number(id);
+  const equipamentos = await db.equipamentos.where('setorId').equals(setorId).toArray();
+  for (const equipamento of equipamentos) {
+    await excluirEquipamento(equipamento.id);
+  }
+  await db.setores.delete(setorId);
 }
 
 /* ---------------- Máquinas/Equipamentos ---------------- */
@@ -157,6 +191,36 @@ export async function criarEquipamento(clienteId, setorId, nome, inspecaoId) {
     setorId: Number(setorId),
     nome: `${numero} - ${nomeFormatado}`,
     criadoEm: Date.now(),
+  });
+}
+
+// Separa o nome da máquina no prefixo numérico ("01") e na parte descritiva.
+export function separarNomeEquipamento(nome) {
+  const combinacao = String(nome).match(/^(\d{2,})\s*-\s*(.*)$/);
+  return combinacao
+    ? { prefixo: combinacao[1], descricao: combinacao[2] }
+    : { prefixo: '', descricao: String(nome) };
+}
+
+// Renomeia a parte descritiva, mantendo o prefixo numérico e a inicial maiúscula.
+export async function renomearEquipamento(id, novaDescricao) {
+  const equipamento = await db.equipamentos.get(Number(id));
+  if (!equipamento) return;
+  const { prefixo } = separarNomeEquipamento(equipamento.nome);
+  const limpo = novaDescricao.trim();
+  const formatado = limpo.charAt(0).toUpperCase() + limpo.slice(1);
+  const nome = prefixo ? `${prefixo} - ${formatado}` : formatado;
+  return db.equipamentos.update(Number(id), { nome });
+}
+
+// Exclui a máquina/equipamento e, em cascata, seus registros, fotos e áudios.
+export async function excluirEquipamento(id) {
+  const equipamentoId = Number(id);
+  await db.transaction('rw', db.equipamentos, db.registros, db.fotos, db.audios, async () => {
+    await db.registros.where('equipamentoId').equals(equipamentoId).delete();
+    await db.fotos.where('equipamentoId').equals(equipamentoId).delete();
+    await db.audios.where('equipamentoId').equals(equipamentoId).delete();
+    await db.equipamentos.delete(equipamentoId);
   });
 }
 
@@ -238,14 +302,14 @@ export async function removerEquipamentoDaInspecao(inspecaoId, equipamentoId) {
 }
 
 // Resumo do registro: { completo, pendentes } com base nos itens obrigatórios
-// (fotos 01 e 02 e a marcação de resultado conforme/não conforme).
+// (fotos 01 e 02, valor medido e resistência do prolongador).
 export async function resumoDoEquipamento(inspecaoId, equipamentoId) {
   const fotos = await listarFotos(inspecaoId, equipamentoId);
   const pendentes = CATEGORIAS_FOTO.filter(
     (categoria) => categoria.obrigatoria && !fotos.some((f) => f.categoria === categoria.id)
   ).map((categoria) => categoria.rotulo);
   const registro = await obterRegistro(inspecaoId, equipamentoId);
-  if (!registro?.resultado) pendentes.push('Resultado da medição (conforme/não conforme)');
+  if (!registro?.valorMedido?.trim()) pendentes.push('Valor medido');
   if (!registro?.prolongador?.trim()) pendentes.push('Resistência do prolongador');
   return { completo: pendentes.length === 0, pendentes, totalFotos: fotos.length };
 }

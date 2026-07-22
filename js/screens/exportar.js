@@ -13,6 +13,7 @@ import {
   obterRegistro,
   listarFotos,
   listarAudios,
+  conformidadeDoValor,
   CATEGORIAS_FOTO,
 } from '../db.js';
 
@@ -26,12 +27,6 @@ function escapar(texto) {
 // Remove caracteres inválidos em nomes de pasta/arquivo, preservando o resto.
 function nomeSeguro(texto) {
   return texto.replace(/[\\/:*?"<>|]/g, '-').trim();
-}
-
-function rotuloResultado(resultado) {
-  if (resultado === 'conforme') return 'Conforme';
-  if (resultado === 'nc') return 'Não conforme';
-  return null;
 }
 
 function extensaoDoAudio(blob) {
@@ -49,12 +44,15 @@ function caminhoUrl(...segmentos) {
 function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
   const secoes = blocos
     .map(({ equipamento, nomeSetor, registro, pasta, arquivosFotos, arquivosAudios }) => {
-      const resultado = rotuloResultado(registro?.resultado);
-      const resultadoHtml = resultado
-        ? `<p class="resultado ${registro.resultado === 'nc' ? 'nc' : 'ok'}">Resultado da medição: <strong>${resultado}</strong></p>`
+      const conformidade = conformidadeDoValor(registro?.valorMedido);
+      const valorMedidoHtml = registro?.valorMedido?.trim()
+        ? `<p class="prolongador">Valor medido: <strong>${escapar(registro.valorMedido)} m</strong></p>`
+        : '';
+      const resultadoHtml = conformidade
+        ? `<p class="resultado ${conformidade === 'NÃO CONFORME' ? 'nc' : 'ok'}">Resultado: <strong>${conformidade}</strong></p>`
         : '';
       const prolongadorHtml = registro?.prolongador
-        ? `<p class="prolongador">Resistência do prolongador: <strong>${escapar(registro.prolongador)} Ω</strong></p>`
+        ? `<p class="prolongador">Resistência do prolongador: <strong>${escapar(registro.prolongador)} m</strong></p>`
         : '';
 
       const grupos = CATEGORIAS_FOTO.map((categoria) => {
@@ -70,9 +68,9 @@ function gerarRelatorioHtml({ inspecao, cliente, blocos }) {
             .map((nome) => `<img src="${caminhoUrl('Fotos', pasta, nome)}" alt="Foto">`)
             .join('')}</div>`;
         }
-        // O resultado da medição e a resistência do prolongador aparecem logo
-        // após a foto do valor medido (02).
-        if (categoria.id === 'valor') bloco += resultadoHtml + prolongadorHtml;
+        // O valor medido, o resultado e a resistência do prolongador aparecem
+        // logo após a foto do valor medido (02).
+        if (categoria.id === 'valor') bloco += valorMedidoHtml + resultadoHtml + prolongadorHtml;
         return bloco;
       }).join('');
 
@@ -198,10 +196,16 @@ export async function telaExportar(inspecaoId) {
         arquivosAudios.push(nome);
       });
 
-      // Resultado da medição: "resultado.txt" ("conforme" / "não conforme").
-      const rotulo = rotuloResultado(registro?.resultado);
-      if (rotulo) {
-        pastaEquipamento.file('resultado.txt', rotulo.toLowerCase());
+      // Valor medido: "valor medido.txt" (valor informado, em m).
+      if (registro?.valorMedido?.trim()) {
+        pastaEquipamento.file('valor medido.txt', registro.valorMedido);
+      }
+
+      // Resultado: "resultado.txt" ("CONFORME" / "NÃO CONFORME"), derivado do
+      // valor medido (acima de 1000 é "NÃO CONFORME").
+      const conformidade = conformidadeDoValor(registro?.valorMedido);
+      if (conformidade) {
+        pastaEquipamento.file('resultado.txt', conformidade);
       }
 
       // Resistência do prolongador: "prolongador.txt".
@@ -226,7 +230,8 @@ export async function telaExportar(inspecaoId) {
         ...equipamento,
         setor: nomeSetor,
         pasta: `Fotos/${pasta}`,
-        resultadoMedicao: rotuloResultado(registro?.resultado),
+        valorMedido: registro?.valorMedido ?? '',
+        resultadoMedicao: conformidadeDoValor(registro?.valorMedido),
         resistenciaProlongador: registro?.prolongador ?? '',
         observacao: registro?.observacao ?? '',
         fotos: arquivosFotos,
