@@ -64,6 +64,132 @@ export function debounce(funcao, espera = 500) {
   };
 }
 
+// Cartão de lista com um botão ⋮ ao lado que abre um menu (Alterar / Apagar).
+// - `href`/`onSelecionar`: navegação ao tocar no cartão.
+// - `valorEditavel`: texto que aparece no campo ao alterar o nome.
+// - `aoRenomear(novoValor)`: salva o novo nome; pode devolver o título a exibir.
+// - `aoApagar()`: exclui o item (após confirmação).
+// - `rotuloAlterar`/`rotuloApagar`: textos das opções do menu.
+export function cartaoComMenu({
+  href,
+  onSelecionar,
+  titulo,
+  detalhe,
+  selo,
+  valorEditavel,
+  aoRenomear,
+  aoApagar,
+  confirmacaoApagar,
+  rotuloAlterar = 'Alterar nome',
+  rotuloApagar = 'Apagar',
+}) {
+  const tituloEl = el('div', { class: 'titulo' }, titulo);
+  const cartao = el(
+    href ? 'a' : 'button',
+    { class: 'cartao', href, onclick: onSelecionar },
+    el('div', { class: 'principal' }, tituloEl, detalhe ? el('div', { class: 'detalhe' }, detalhe) : null),
+    selo || null,
+    el('span', { class: 'seta' }, '›')
+  );
+
+  // Editor inline (aparece ao escolher "Alterar nome")
+  const input = el('input', { type: 'text', value: valorEditavel ?? titulo });
+  const editor = el('div', { class: 'editor-inline', hidden: true });
+
+  // Menu suspenso do botão ⋮
+  const menu = el('div', { class: 'menu-acoes', hidden: true });
+
+  const container = el('div', { class: 'item-editavel' });
+
+  function fecharMenu() {
+    menu.hidden = true;
+    document.removeEventListener('click', aoClicarFora, true);
+  }
+  function aoClicarFora(evento) {
+    if (!container.contains(evento.target)) fecharMenu();
+  }
+  function abrirMenu() {
+    menu.hidden = false;
+    setTimeout(() => document.addEventListener('click', aoClicarFora, true), 0);
+  }
+
+  const btnMenu = el(
+    'button',
+    {
+      class: 'btn-menu',
+      type: 'button',
+      title: 'Opções',
+      'aria-label': 'Opções',
+      onclick: (evento) => {
+        evento.preventDefault();
+        evento.stopPropagation();
+        menu.hidden ? abrirMenu() : fecharMenu();
+      },
+    },
+    '⋮'
+  );
+
+  const abrirEditor = () => {
+    fecharMenu();
+    editor.hidden = false;
+    input.value = valorEditavel ?? titulo;
+    input.focus();
+  };
+  const fecharEditor = () => {
+    editor.hidden = true;
+  };
+
+  menu.append(
+    el('button', { type: 'button', onclick: abrirEditor }, rotuloAlterar),
+    el(
+      'button',
+      {
+        class: 'apagar',
+        type: 'button',
+        onclick: async () => {
+          fecharMenu();
+          if (!confirm(confirmacaoApagar || 'Apagar este item? Esta ação não pode ser desfeita.')) return;
+          await aoApagar();
+          container.remove();
+          toast('Apagado.');
+        },
+      },
+      rotuloApagar
+    )
+  );
+
+  editor.append(
+    input,
+    el(
+      'button',
+      {
+        class: 'btn btn-secundario',
+        type: 'button',
+        onclick: async () => {
+          const novo = input.value.trim();
+          if (!novo) {
+            toast('Informe um nome.');
+            input.focus();
+            return;
+          }
+          const novoTitulo = await aoRenomear(novo);
+          tituloEl.textContent = novoTitulo ?? novo;
+          fecharEditor();
+          toast('Nome alterado.');
+        },
+      },
+      'Salvar'
+    ),
+    el('button', { class: 'btn btn-discreto', type: 'button', onclick: fecharEditor }, 'Cancelar')
+  );
+
+  container.append(
+    el('div', { class: 'linha-cartao' }, cartao, el('div', { class: 'acoes-wrap' }, btnMenu, menu)),
+    editor
+  );
+  return container;
+}
+
 // Botão de ditado por voz (🎤) para um campo de texto. Usa o reconhecimento
 // de fala do navegador (pt-BR), que precisa de internet — offline ou sem
 // suporte, avisa e o usuário digita normalmente. O texto reconhecido é

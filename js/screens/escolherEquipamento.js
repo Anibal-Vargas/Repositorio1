@@ -2,14 +2,19 @@
 // 1) escolher (ou criar) o setor; 2) registrar as máquinas/equipamentos do setor,
 // uma após a outra, sem precisar reescolher o setor.
 
-import { el, cabecalho, toast, botaoDitado } from '../ui.js';
+import { el, cabecalho, toast, botaoDitado, cartaoComMenu } from '../ui.js';
 import {
   obterInspecao,
   listarSetores,
   obterSetor,
   criarSetor,
+  renomearSetor,
+  excluirSetor,
   listarEquipamentosDoSetor,
   criarEquipamento,
+  renomearEquipamento,
+  excluirEquipamento,
+  separarNomeEquipamento,
   incluirEquipamentoNaInspecao,
   equipamentosDaInspecao,
   resumoDoEquipamento,
@@ -50,22 +55,17 @@ export async function telaEscolherSetor(inspecaoId) {
     const equipamentos = await listarEquipamentosDoSetor(setor.id);
     const nestaInspecao = equipamentos.filter((e) => registradas.has(e.id)).length;
     cartoes.push(
-      el(
-        'a',
-        { class: 'cartao', href: `#/inspecao/${inspecaoId}/setor/${setor.id}` },
-        el(
-          'div',
-          { class: 'principal' },
-          el('div', { class: 'titulo' }, setor.nome),
-          el(
-            'div',
-            { class: 'detalhe' },
-            `${equipamentos.length} máquina(s)/equipamento(s)` +
-              (nestaInspecao > 0 ? ` · ${nestaInspecao} nesta inspeção` : '')
-          )
-        ),
-        el('span', { class: 'seta' }, '›')
-      )
+      cartaoComMenu({
+        href: `#/inspecao/${inspecaoId}/setor/${setor.id}`,
+        titulo: setor.nome,
+        detalhe:
+          `${equipamentos.length} máquina(s)/equipamento(s)` +
+          (nestaInspecao > 0 ? ` · ${nestaInspecao} nesta inspeção` : ''),
+        valorEditavel: setor.nome,
+        aoRenomear: (novo) => renomearSetor(setor.id, novo).then(() => novo),
+        aoApagar: () => excluirSetor(setor.id),
+        confirmacaoApagar: `Apagar o setor "${setor.nome}"? Todas as máquinas/equipamentos dele e seus registros, fotos e áudios (em qualquer inspeção) serão apagados.`,
+      })
     );
   }
 
@@ -145,14 +145,23 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
         ? el('span', { class: 'selo selo-verde' }, 'OK')
         : el('span', { class: 'selo selo-vermelho' }, 'Pendente');
     }
+    const idEquip = equipamento.id;
     cartoes.push(
-      el(
-        'button',
-        { class: 'cartao', onclick: () => incluir(equipamento.id) },
-        el('div', { class: 'principal' }, el('div', { class: 'titulo' }, equipamento.nome)),
+      cartaoComMenu({
+        onSelecionar: () => incluir(idEquip),
+        titulo: equipamento.nome,
         selo,
-        el('span', { class: 'seta' }, '›')
-      )
+        // Ao alterar, edita só a parte descritiva — o prefixo numérico é mantido.
+        valorEditavel: separarNomeEquipamento(equipamento.nome).descricao,
+        aoRenomear: async (novo) => {
+          await renomearEquipamento(idEquip, novo);
+          const { prefixo } = separarNomeEquipamento(equipamento.nome);
+          const cap = novo.charAt(0).toUpperCase() + novo.slice(1);
+          return prefixo ? `${prefixo} - ${cap}` : cap;
+        },
+        aoApagar: () => excluirEquipamento(idEquip),
+        confirmacaoApagar: `Apagar "${equipamento.nome}"? Os registros, fotos e áudios dela (em qualquer inspeção) serão apagados.`,
+      })
     );
   }
 

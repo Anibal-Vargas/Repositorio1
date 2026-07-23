@@ -114,6 +114,46 @@ export async function criarCliente(nome) {
   return db.clientes.add({ nome: nome.trim(), criadoEm: Date.now() });
 }
 
+export async function renomearCliente(id, nome) {
+  return db.clientes.update(Number(id), { nome: nome.trim() });
+}
+
+// Exclui o cliente e, em cascata, seus setores, máquinas/equipamentos,
+// inspeções e todos os registros, fotos e áudios relacionados.
+export async function excluirCliente(id) {
+  const clienteId = Number(id);
+  const inspecoes = await db.inspecoes.where('clienteId').equals(clienteId).toArray();
+  const equipamentos = await db.equipamentos.where('clienteId').equals(clienteId).toArray();
+  const inspIds = inspecoes.map((i) => i.id);
+  const equipIds = equipamentos.map((e) => e.id);
+  await db.transaction(
+    'rw',
+    db.clientes,
+    db.setores,
+    db.equipamentos,
+    db.inspecoes,
+    db.registros,
+    db.fotos,
+    db.audios,
+    async () => {
+      if (inspIds.length) {
+        await db.registros.where('inspecaoId').anyOf(inspIds).delete();
+        await db.fotos.where('inspecaoId').anyOf(inspIds).delete();
+        await db.audios.where('inspecaoId').anyOf(inspIds).delete();
+      }
+      if (equipIds.length) {
+        await db.registros.where('equipamentoId').anyOf(equipIds).delete();
+        await db.fotos.where('equipamentoId').anyOf(equipIds).delete();
+        await db.audios.where('equipamentoId').anyOf(equipIds).delete();
+      }
+      await db.inspecoes.where('clienteId').equals(clienteId).delete();
+      await db.equipamentos.where('clienteId').equals(clienteId).delete();
+      await db.setores.where('clienteId').equals(clienteId).delete();
+      await db.clientes.delete(clienteId);
+    }
+  );
+}
+
 /* ---------------- Setores ---------------- */
 
 export async function listarSetores(clienteId) {
@@ -136,6 +176,21 @@ export async function criarSetor(clienteId, nome) {
   return db.setores.add({ clienteId: Number(clienteId), nome: nomeLimpo, criadoEm: Date.now() });
 }
 
+export async function renomearSetor(id, nome) {
+  return db.setores.update(Number(id), { nome: nome.trim() });
+}
+
+// Exclui o setor e, em cascata, suas máquinas/equipamentos e os registros,
+// fotos e áudios delas (em qualquer inspeção).
+export async function excluirSetor(id) {
+  const setorId = Number(id);
+  const equipamentos = await db.equipamentos.where('setorId').equals(setorId).toArray();
+  for (const equipamento of equipamentos) {
+    await excluirEquipamento(equipamento.id);
+  }
+  await db.setores.delete(setorId);
+}
+
 /* ---------------- Máquinas/Equipamentos ---------------- */
 
 export async function listarEquipamentosDoSetor(setorId) {
@@ -145,6 +200,36 @@ export async function listarEquipamentosDoSetor(setorId) {
 
 export async function obterEquipamento(id) {
   return db.equipamentos.get(Number(id));
+}
+
+// Separa o nome da máquina no prefixo numérico ("01") e na parte descritiva.
+export function separarNomeEquipamento(nome) {
+  const combinacao = String(nome).match(/^(\d{2,})\s*-\s*(.*)$/);
+  return combinacao
+    ? { prefixo: combinacao[1], descricao: combinacao[2] }
+    : { prefixo: '', descricao: String(nome) };
+}
+
+// Renomeia a parte descritiva, mantendo o prefixo numérico e a inicial maiúscula.
+export async function renomearEquipamento(id, novaDescricao) {
+  const equipamento = await db.equipamentos.get(Number(id));
+  if (!equipamento) return;
+  const { prefixo } = separarNomeEquipamento(equipamento.nome);
+  const limpo = novaDescricao.trim();
+  const formatado = limpo.charAt(0).toUpperCase() + limpo.slice(1);
+  const nome = prefixo ? `${prefixo} - ${formatado}` : formatado;
+  return db.equipamentos.update(Number(id), { nome });
+}
+
+// Exclui a máquina/equipamento e, em cascata, seus registros, fotos e áudios.
+export async function excluirEquipamento(id) {
+  const equipamentoId = Number(id);
+  await db.transaction('rw', db.equipamentos, db.registros, db.fotos, db.audios, async () => {
+    await db.registros.where('equipamentoId').equals(equipamentoId).delete();
+    await db.fotos.where('equipamentoId').equals(equipamentoId).delete();
+    await db.audios.where('equipamentoId').equals(equipamentoId).delete();
+    await db.equipamentos.delete(equipamentoId);
+  });
 }
 
 // Cria a máquina/equipamento no setor, precedendo o nome com a numeração

@@ -281,6 +281,101 @@ h2 {
   padding: 1rem 0;
 }
 
+/* Cartão de lista com botão ⋮ (menu Alterar/Apagar) e edição inline */
+.linha-cartao {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.linha-cartao .cartao {
+  flex: 1;
+  min-width: 0;
+}
+
+.acoes-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.btn-menu {
+  width: 46px;
+  min-height: 44px;
+  height: 100%;
+  background: var(--branco);
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  color: var(--cinza);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.btn-menu:active {
+  background: var(--laranja-suave);
+  border-color: var(--laranja);
+}
+
+.menu-acoes {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 160px;
+  background: var(--branco);
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  overflow: hidden;
+}
+
+.menu-acoes button {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--grafite);
+  cursor: pointer;
+}
+
+.menu-acoes button:active {
+  background: var(--laranja-suave);
+}
+
+.menu-acoes button.apagar {
+  color: var(--vermelho);
+  border-top: 1px solid var(--borda);
+}
+
+.editor-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.7rem;
+  border: 1.5px dashed var(--borda);
+  border-radius: var(--raio);
+}
+
+/* O atributo hidden precisa vencer os display: flex/block acima */
+.editor-inline[hidden],
+.menu-acoes[hidden] {
+  display: none;
+}
+
+.editor-inline input {
+  flex: 1 1 100%;
+}
+
+.editor-inline .btn {
+  flex: 1;
+}
+
 /* ============================================================
    Formulários
    ============================================================ */
