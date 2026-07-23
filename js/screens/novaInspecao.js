@@ -42,22 +42,13 @@ export async function telaNovaInspecao() {
     toast('Inspetor incluído.');
   }
 
-  async function iniciar(clienteId) {
-    const inspetor = seletorInspetor.value;
-    if (!inspetor) {
-      toast('Escolha o inspetor.');
-      seletorInspetor.focus();
-      return;
-    }
-    try {
-      const inspecaoId = await criarInspecao(clienteId, inspetor);
-      toast('Inspeção criada.');
-      // Vai direto para a escolha do setor — o fluxo de campo começa aqui.
-      location.hash = `#/inspecao/${inspecaoId}/equipamentos`;
-    } catch {
-      toast('Erro ao criar a inspeção.');
-    }
-  }
+  // Cliente em lista suspensa (mesmo padrão do inspetor). O valor da opção é o id.
+  const seletorCliente = el(
+    'select',
+    {},
+    el('option', { value: '' }, 'Escolha o cliente…'),
+    clientes.map((cliente) => el('option', { value: String(cliente.id) }, cliente.nome))
+  );
 
   const campoNovoCliente = el('input', {
     type: 'text',
@@ -65,21 +56,41 @@ export async function telaNovaInspecao() {
     autocomplete: 'off',
   });
 
-  async function criarEIniciar() {
+  async function adicionarCliente() {
     const nome = campoNovoCliente.value.trim();
     if (!nome) {
       toast('Informe o nome do cliente.');
       campoNovoCliente.focus();
       return;
     }
-    if (!seletorInspetor.value) {
+    const clienteId = await criarCliente(nome);
+    seletorCliente.append(el('option', { value: String(clienteId) }, nome));
+    seletorCliente.value = String(clienteId);
+    campoNovoCliente.value = '';
+    toast('Cliente incluído.');
+  }
+
+  async function iniciar() {
+    const inspetor = seletorInspetor.value;
+    if (!inspetor) {
       toast('Escolha o inspetor.');
       seletorInspetor.focus();
       return;
     }
-    const clienteId = await criarCliente(nome);
-    toast('Cliente criado.');
-    await iniciar(clienteId);
+    const clienteId = seletorCliente.value;
+    if (!clienteId) {
+      toast('Escolha o cliente.');
+      seletorCliente.focus();
+      return;
+    }
+    try {
+      const inspecaoId = await criarInspecao(Number(clienteId), inspetor);
+      toast('Inspeção criada.');
+      // Vai direto para a escolha do setor — o fluxo de campo começa aqui.
+      location.hash = `#/inspecao/${inspecaoId}/equipamentos`;
+    } catch {
+      toast('Erro ao criar a inspeção.');
+    }
   }
 
   return [
@@ -96,26 +107,14 @@ export async function telaNovaInspecao() {
         el('button', { class: 'btn btn-secundario', onclick: adicionarInspetor }, '+ Incluir')
       ),
       el('h2', {}, 'Cliente'),
-      clientes.length === 0
-        ? el('div', { class: 'vazio' }, 'Nenhum cliente ainda. Crie o primeiro abaixo.')
-        : el(
-            'div',
-            { class: 'lista' },
-            clientes.map((cliente) =>
-              el(
-                'button',
-                { class: 'cartao', onclick: () => iniciar(cliente.id) },
-                el('div', { class: 'principal' }, el('div', { class: 'titulo' }, cliente.nome)),
-                el('span', { class: 'seta' }, '›')
-              )
-            )
-          ),
+      seletorCliente,
       el(
         'div',
         { class: 'linha-form' },
         campoNovoCliente,
-        el('button', { class: 'btn btn-secundario', onclick: criarEIniciar }, '+ Criar')
-      )
+        el('button', { class: 'btn btn-secundario', onclick: adicionarCliente }, '+ Incluir')
+      ),
+      el('button', { class: 'btn btn-primario btn-grande', onclick: iniciar }, 'Iniciar inspeção')
     ),
   ];
 }
