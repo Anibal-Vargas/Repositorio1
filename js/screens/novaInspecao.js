@@ -42,33 +42,12 @@ export async function telaNovaInspecao() {
     toast('Inspetor incluído.');
   }
 
-  // Cliente em lista suspensa (mesmo padrão do inspetor). O valor da opção é o id.
-  const seletorCliente = el(
-    'select',
-    {},
-    el('option', { value: '' }, 'Escolha o cliente…'),
-    clientes.map((cliente) => el('option', { value: String(cliente.id) }, cliente.nome))
-  );
-
-  const campoNovoCliente = el('input', {
+  // Cliente: apenas um campo para digitar o nome (sem lista/histórico).
+  const campoCliente = el('input', {
     type: 'text',
-    placeholder: 'Nome do novo cliente',
+    placeholder: 'Nome do cliente',
     autocomplete: 'off',
   });
-
-  async function adicionarCliente() {
-    const nome = campoNovoCliente.value.trim();
-    if (!nome) {
-      toast('Informe o nome do cliente.');
-      campoNovoCliente.focus();
-      return;
-    }
-    const clienteId = await criarCliente(nome);
-    seletorCliente.append(el('option', { value: String(clienteId) }, nome));
-    seletorCliente.value = String(clienteId);
-    campoNovoCliente.value = '';
-    toast('Cliente incluído.');
-  }
 
   async function iniciar() {
     const inspetor = seletorInspetor.value;
@@ -77,13 +56,18 @@ export async function telaNovaInspecao() {
       seletorInspetor.focus();
       return;
     }
-    const clienteId = seletorCliente.value;
-    if (!clienteId) {
-      toast('Escolha o cliente.');
-      seletorCliente.focus();
+    const nomeCliente = campoCliente.value.trim();
+    if (!nomeCliente) {
+      toast('Informe o nome do cliente.');
+      campoCliente.focus();
       return;
     }
     try {
+      // Reaproveita um cliente de mesmo nome (se houver) ou cria um novo.
+      const existente = clientes.find(
+        (cliente) => cliente.nome.toLowerCase() === nomeCliente.toLowerCase()
+      );
+      const clienteId = existente ? existente.id : await criarCliente(nomeCliente);
       const inspecaoId = await criarInspecao(Number(clienteId), inspetor);
       toast('Inspeção criada.');
       // Vai direto para a escolha do setor — o fluxo de campo começa aqui.
@@ -107,13 +91,7 @@ export async function telaNovaInspecao() {
         el('button', { class: 'btn btn-secundario', onclick: adicionarInspetor }, '+ Incluir')
       ),
       el('h2', {}, 'Cliente'),
-      seletorCliente,
-      el(
-        'div',
-        { class: 'linha-form' },
-        campoNovoCliente,
-        el('button', { class: 'btn btn-secundario', onclick: adicionarCliente }, '+ Incluir')
-      ),
+      campoCliente,
       el('button', { class: 'btn btn-primario btn-grande', onclick: iniciar }, 'Iniciar inspeção')
     ),
   ];
