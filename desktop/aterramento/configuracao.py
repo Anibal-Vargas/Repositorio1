@@ -17,6 +17,9 @@ from dataclasses import asdict, dataclass
 
 @dataclass
 class Configuracao:
+    # Data da inspeção (dd/mm/aaaa) — usada em todos os documentos.
+    data_inspecao: str = ""
+
     # Empresa responsável pelas medições (Nord) e engenheiro.
     engenheiro: str = "Aníbal Rosa Vargas"
     crea: str = "069788-5"

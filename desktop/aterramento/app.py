@@ -34,11 +34,18 @@ BRANCO = "#ffffff"
 
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".aterramento", "config.json")
 
-TITULO = ("Medição de continuidade de aterramento elétrico de máquinas e "
-          "equipamentos — Nord Consult Ltda.")
+# Texto exibido na barra (cabeçalho) das telas.
+TITULO = "Gerador de documentos de medições de continuidade de aterramento elétrico"
+
+# Título da janela do sistema (canto superior esquerdo).
+TITULO_JANELA = ("Medição de continuidade de aterramento elétrico de "
+                 "máquinas e equipamentos")
 
 # Rótulos amigáveis dos campos de configuração (ordem de exibição por grupo).
 GRUPOS_CONFIG = [
+    ("Inspeção", [
+        ("data_inspecao", "Data da inspeção (dd/mm/aaaa)"),
+    ]),
     ("Empresa responsável (Nord)", [
         ("engenheiro", "Engenheiro responsável"),
         ("crea", "CREA"),
@@ -114,10 +121,10 @@ def _frame_rolavel(pai):
 
 
 def _cabecalho(pai, texto: str):
-    barra = tk.Frame(pai, bg=GRAFITE, height=54)
+    barra = tk.Frame(pai, bg=LARANJA_FORTE, height=54)
     barra.pack(fill="x", side="top")
-    tk.Frame(barra, bg=LARANJA, height=4).pack(fill="x", side="bottom")
-    tk.Label(barra, text=texto, bg=GRAFITE, fg=BRANCO,
+    tk.Frame(barra, bg=GRAFITE, height=4).pack(fill="x", side="bottom")
+    tk.Label(barra, text=texto, bg=LARANJA_FORTE, fg=BRANCO,
              font=("Segoe UI", 12, "bold")).pack(side="left", padx=16, pady=10)
     return barra
 
@@ -135,6 +142,14 @@ class JanelaConfig(tk.Toplevel):
         self.ao_salvar = ao_salvar
         self._vars: dict[str, tk.StringVar] = {}
 
+        # Data da inspeção: se ainda não informada, sugere a de hoje.
+        if not config.data_inspecao:
+            config.data_inspecao = datetime.date.today().strftime("%d/%m/%Y")
+
+        # Modal: mantém a janela sempre à frente da tela principal (evita que
+        # "suma" atrás ao usar o seletor de arquivos).
+        self.transient(pai)
+
         _cabecalho(self, "Configuração — preencha uma vez")
         container, interno = _frame_rolavel(self)
         container.pack(fill="both", expand=True)
@@ -150,11 +165,27 @@ class JanelaConfig(tk.Toplevel):
 
         rodape = tk.Frame(self, bg=BRANCO)
         rodape.pack(fill="x", side="bottom")
-        tk.Button(rodape, text="Salvar", bg=LARANJA, fg=BRANCO,
-                  font=("Segoe UI", 10, "bold"), relief="flat", padx=20, pady=8,
-                  command=self._salvar).pack(side="right", padx=12, pady=10)
+        self.btn_salvar = tk.Button(
+            rodape, text="Salvar", bg=LARANJA, fg=BRANCO,
+            font=("Segoe UI", 10, "bold"), relief="flat", padx=20, pady=8,
+            state="disabled", command=self._salvar)
+        self.btn_salvar.pack(side="right", padx=12, pady=10)
         tk.Button(rodape, text="Cancelar", relief="flat", padx=16, pady=8,
                   command=self.destroy).pack(side="right", pady=10)
+
+        # Só habilita "Salvar" quando todos os campos estiverem preenchidos.
+        for var in self._vars.values():
+            var.trace_add("write", self._validar)
+        self._validar()
+
+        self.grab_set()
+        self.focus_force()
+
+    def _validar(self, *_):
+        if not hasattr(self, "btn_salvar"):
+            return
+        completo = all(v.get().strip() for v in self._vars.values())
+        self.btn_salvar.config(state=("normal" if completo else "disabled"))
 
     def _grupo(self, pai, titulo):
         tk.Label(pai, text=titulo, bg=BRANCO, fg=LARANJA_FORTE,
@@ -180,8 +211,12 @@ class JanelaConfig(tk.Toplevel):
 
         def escolher():
             caminho = filedialog.askopenfilename(
+                parent=self,
                 title=rotulo,
                 filetypes=[("Imagens", "*.png *.jpg *.jpeg"), ("Todos", "*.*")])
+            # Reforça o foco de volta para esta janela após o seletor.
+            self.lift()
+            self.focus_force()
             if caminho:
                 var.set(caminho)
         tk.Button(linha, text="…", command=escolher, relief="flat",
@@ -200,11 +235,11 @@ class JanelaConfig(tk.Toplevel):
         try:
             salvar_config(self.config_obj)
         except Exception as e:  # pragma: no cover
-            messagebox.showerror("Erro", f"Não foi possível salvar: {e}")
+            messagebox.showerror("Erro", f"Não foi possível salvar: {e}", parent=self)
             return
         if self.ao_salvar:
             self.ao_salvar(self.config_obj)
-        messagebox.showinfo("Configuração", "Configuração salva.")
+        messagebox.showinfo("Configuração", "Configuração salva.", parent=self)
         self.destroy()
 
 
@@ -323,7 +358,7 @@ class LinhaMaquina(tk.Frame):
 class Aplicativo(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Relatórios de Aterramento — Nord Consult")
+        self.title(TITULO_JANELA)
         self.geometry("980x720")
         self.configure(bg=BRANCO)
         self.config_obj = carregar_config()
@@ -338,16 +373,16 @@ class Aplicativo(tk.Tk):
     def _barra_acoes(self):
         barra = tk.Frame(self, bg="#f3f4f6")
         barra.pack(fill="x")
-        tk.Button(barra, text="Abrir pacote (.zip)", bg=LARANJA, fg=BRANCO,
-                  font=("Segoe UI", 10, "bold"), relief="flat", padx=16, pady=8,
-                  command=self._abrir_pacote).pack(side="left", padx=8, pady=8)
-        tk.Button(barra, text="Configuração", relief="flat", padx=12, pady=8,
-                  command=self._abrir_config).pack(side="left", pady=8)
-        self.btn_gerar = tk.Button(
-            barra, text="Gerar documentos", bg=VERDE, fg=BRANCO,
-            font=("Segoe UI", 10, "bold"), relief="flat", padx=16, pady=8,
-            state="disabled", command=self._gerar)
-        self.btn_gerar.pack(side="right", padx=8, pady=8)
+        estilo = dict(bg=LARANJA, fg=BRANCO, font=("Segoe UI", 10, "bold"),
+                      relief="flat", padx=16, pady=8,
+                      activebackground=LARANJA_FORTE, activeforeground=BRANCO)
+        tk.Button(barra, text="Configuração", command=self._abrir_config,
+                  **estilo).pack(side="left", padx=(8, 4), pady=8)
+        tk.Button(barra, text="Abrir pacote (.zip)", command=self._abrir_pacote,
+                  **estilo).pack(side="left", padx=4, pady=8)
+        self.btn_gerar = tk.Button(barra, text="Gerar documentos",
+                                   command=self._gerar, state="disabled", **estilo)
+        self.btn_gerar.pack(side="left", padx=4, pady=8)
 
     def _area_conteudo(self):
         self.conteudo = tk.Frame(self, bg=BRANCO)
@@ -359,11 +394,24 @@ class Aplicativo(tk.Tk):
 
     def _tela_inicial(self):
         self._limpar_conteudo()
-        tk.Label(self.conteudo,
+        centro = tk.Frame(self.conteudo, bg=BRANCO)
+        centro.pack(expand=True)
+        # Logomarca da Nord Consult.
+        try:
+            from PIL import Image, ImageTk
+            caminho = os.path.join(os.path.dirname(__file__), "logo-nord.png")
+            if os.path.exists(caminho):
+                img = Image.open(caminho)
+                img.thumbnail((360, 240))
+                self._logo_ref = ImageTk.PhotoImage(img)
+                tk.Label(centro, image=self._logo_ref, bg=BRANCO).pack(pady=(0, 18))
+        except Exception:
+            pass
+        tk.Label(centro,
                  text="Abra o pacote .zip exportado pelo aplicativo de campo\n"
                       "para conferir as medições e gerar os relatórios.",
                  bg=BRANCO, fg=CINZA, font=("Segoe UI", 11),
-                 justify="center").pack(expand=True)
+                 justify="center").pack()
 
     def _abrir_config(self):
         JanelaConfig(self, self.config_obj,
@@ -392,18 +440,16 @@ class Aplicativo(tk.Tk):
         cab.pack(fill="x", padx=12, pady=8)
         self.var_cliente = tk.StringVar(value=p.cliente.nome or "")
         self.var_inspetor = tk.StringVar(value=p.inspecao.inspetor or "")
-        data = p.data_inspecao
-        self.var_data = tk.StringVar(
-            value=(data.strftime("%d/%m/%Y") if data else
-                   datetime.date.today().strftime("%d/%m/%Y")))
         for i, (rot, var, larg) in enumerate([
                 ("Cliente", self.var_cliente, 28),
-                ("Inspetor", self.var_inspetor, 22),
-                ("Data das medições", self.var_data, 12)]):
+                ("Inspetor", self.var_inspetor, 22)]):
             tk.Label(cab, text=rot + ":", bg=BRANCO, fg=GRAFITE).grid(
                 row=0, column=i * 2, sticky="w", padx=(8, 2))
             tk.Entry(cab, textvariable=var, width=larg).grid(
                 row=0, column=i * 2 + 1, padx=(0, 8))
+        tk.Label(cab, text=f"Data da inspeção: {self.config_obj.data_inspecao or '—'} "
+                          "(definida na Configuração)",
+                 bg=BRANCO, fg=CINZA).grid(row=0, column=4, sticky="w", padx=(12, 0))
 
         resumo = (f"{p.total} máquinas · {len(p.conformes)} conforme · "
                   f"{len(p.nao_conformes)} não conforme · {len(p.pendentes)} pendente(s)")
@@ -420,11 +466,15 @@ class Aplicativo(tk.Tk):
         self.btn_gerar.config(state="normal")
 
     def _data_medicoes(self):
-        try:
-            return datetime.datetime.strptime(self.var_data.get().strip(),
-                                              "%d/%m/%Y").date()
-        except ValueError:
-            return datetime.date.today()
+        # A data vem da Configuração e é usada em todos os documentos.
+        texto = (self.config_obj.data_inspecao or "").strip()
+        for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+            try:
+                return datetime.datetime.strptime(texto, fmt).date()
+            except ValueError:
+                continue
+        d = self.pacote.data_inspecao if self.pacote else None
+        return d.date() if d else datetime.date.today()
 
     def _gerar(self):
         # Monta as medições a partir dos campos.
@@ -450,7 +500,8 @@ class Aplicativo(tk.Tk):
             if not ok:
                 return
 
-        pasta = filedialog.askdirectory(title="Escolha a pasta para salvar")
+        pasta = filedialog.askdirectory(
+            title="Escolha a pasta para salvar os laudos e planilha")
         if not pasta:
             return
 
