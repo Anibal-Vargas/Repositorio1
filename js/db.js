@@ -57,16 +57,30 @@ export const INSPETORES_PADRAO = [
 ];
 
 // Categorias de foto do registro de cada máquina/equipamento.
-// Na exportação os arquivos recebem nomes fixos: 01, 02, 03 e 04 a 14 (adicionais).
+// Na exportação os arquivos recebem nomes fixos: 01, 02 e 03 a 13 (adicionais).
 export const CATEGORIAS_FOTO = [
   { id: 'maquina', numero: '01', rotulo: 'Foto da máquina/equipamento', obrigatoria: true, limite: 1 },
   { id: 'valor', numero: '02', rotulo: 'Foto do valor medido', obrigatoria: true, limite: 1 },
-  { id: 'prancheta', numero: '03', rotulo: 'Foto da prancheta', obrigatoria: false, limite: 1 },
-  { id: 'adicional', numero: '04', rotulo: 'Fotos adicionais', obrigatoria: false, limite: 11 },
+  { id: 'adicional', numero: '03', rotulo: 'Fotos adicionais', obrigatoria: false, limite: 11 },
 ];
 
 // Valor predefinido do campo "Resistência do prolongador" (obrigatório).
-export const PROLONGADOR_PADRAO = '0,2';
+export const PROLONGADOR_PADRAO = '0,8';
+
+// Converte o texto do valor medido em número. Vírgula é o separador decimal
+// (pt-BR); pontos são tratados como separador de milhar. Ignora unidades/texto.
+export function numeroDoValor(texto) {
+  if (texto === null || texto === undefined) return NaN;
+  let s = String(texto).replace(/[^\d.,-]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  return parseFloat(s);
+}
+
+// Regra de conformidade do valor medido: acima de 1000 é "NÃO CONFORME".
+export function conformidadeDoValor(valorMedido) {
+  if (!String(valorMedido ?? '').trim()) return null;
+  return numeroDoValor(valorMedido) > 1000 ? 'NÃO CONFORME' : 'CONFORME';
+}
 
 /* ---------------- Inspetores ---------------- */
 
@@ -238,14 +252,14 @@ export async function removerEquipamentoDaInspecao(inspecaoId, equipamentoId) {
 }
 
 // Resumo do registro: { completo, pendentes } com base nos itens obrigatórios
-// (fotos 01 e 02 e a marcação de resultado conforme/não conforme).
+// (fotos 01 e 02, valor medido e resistência do prolongador).
 export async function resumoDoEquipamento(inspecaoId, equipamentoId) {
   const fotos = await listarFotos(inspecaoId, equipamentoId);
   const pendentes = CATEGORIAS_FOTO.filter(
     (categoria) => categoria.obrigatoria && !fotos.some((f) => f.categoria === categoria.id)
   ).map((categoria) => categoria.rotulo);
   const registro = await obterRegistro(inspecaoId, equipamentoId);
-  if (!registro?.resultado) pendentes.push('Resultado da medição (conforme/não conforme)');
+  if (!registro?.valorMedido?.trim()) pendentes.push('Valor medido');
   if (!registro?.prolongador?.trim()) pendentes.push('Resistência do prolongador');
   return { completo: pendentes.length === 0, pendentes, totalFotos: fotos.length };
 }
