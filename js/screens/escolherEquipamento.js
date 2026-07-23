@@ -2,19 +2,14 @@
 // 1) escolher (ou criar) o setor; 2) registrar as máquinas/equipamentos do setor,
 // uma após a outra, sem precisar reescolher o setor.
 
-import { el, cabecalho, toast, botaoDitado, cartaoEditavel } from '../ui.js';
+import { el, cabecalho, toast, botaoDitado } from '../ui.js';
 import {
   obterInspecao,
   listarSetores,
   obterSetor,
   criarSetor,
-  renomearSetor,
-  excluirSetor,
   listarEquipamentosDoSetor,
   criarEquipamento,
-  renomearEquipamento,
-  excluirEquipamento,
-  separarNomeEquipamento,
   incluirEquipamentoNaInspecao,
   equipamentosDaInspecao,
   resumoDoEquipamento,
@@ -55,17 +50,22 @@ export async function telaEscolherSetor(inspecaoId) {
     const equipamentos = await listarEquipamentosDoSetor(setor.id);
     const nestaInspecao = equipamentos.filter((e) => registradas.has(e.id)).length;
     cartoes.push(
-      cartaoEditavel({
-        href: `#/inspecao/${inspecaoId}/setor/${setor.id}`,
-        titulo: setor.nome,
-        detalhe:
-          `${equipamentos.length} máquina(s)/equipamento(s)` +
-          (nestaInspecao > 0 ? ` · ${nestaInspecao} nesta inspeção` : ''),
-        valorEditavel: setor.nome,
-        aoRenomear: (novo) => renomearSetor(setor.id, novo).then(() => novo),
-        aoExcluir: () => excluirSetor(setor.id),
-        confirmacaoExcluir: `Excluir o setor "${setor.nome}"? Todas as máquinas/equipamentos dele e seus registros, fotos e áudios (em qualquer inspeção) serão apagados. Esta ação não pode ser desfeita.`,
-      })
+      el(
+        'a',
+        { class: 'cartao', href: `#/inspecao/${inspecaoId}/setor/${setor.id}` },
+        el(
+          'div',
+          { class: 'principal' },
+          el('div', { class: 'titulo' }, setor.nome),
+          el(
+            'div',
+            { class: 'detalhe' },
+            `${equipamentos.length} máquina(s)/equipamento(s)` +
+              (nestaInspecao > 0 ? ` · ${nestaInspecao} nesta inspeção` : '')
+          )
+        ),
+        el('span', { class: 'seta' }, '›')
+      )
     );
   }
 
@@ -145,23 +145,14 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
         ? el('span', { class: 'selo selo-verde' }, 'OK')
         : el('span', { class: 'selo selo-vermelho' }, 'Pendente');
     }
-    const idEquip = equipamento.id;
     cartoes.push(
-      cartaoEditavel({
-        onSelecionar: () => incluir(idEquip),
-        titulo: equipamento.nome,
+      el(
+        'button',
+        { class: 'cartao', onclick: () => incluir(equipamento.id) },
+        el('div', { class: 'principal' }, el('div', { class: 'titulo' }, equipamento.nome)),
         selo,
-        // Ao renomear, edita só a parte descritiva — o prefixo numérico é mantido.
-        valorEditavel: separarNomeEquipamento(equipamento.nome).descricao,
-        aoRenomear: async (novo) => {
-          await renomearEquipamento(idEquip, novo);
-          const { prefixo } = separarNomeEquipamento(equipamento.nome);
-          const cap = novo.charAt(0).toUpperCase() + novo.slice(1);
-          return prefixo ? `${prefixo} - ${cap}` : cap;
-        },
-        aoExcluir: () => excluirEquipamento(idEquip),
-        confirmacaoExcluir: `Excluir "${equipamento.nome}"? Os registros, fotos e áudios dela (em qualquer inspeção) serão apagados. Esta ação não pode ser desfeita.`,
-      })
+        el('span', { class: 'seta' }, '›')
+      )
     );
   }
 

@@ -160,46 +160,49 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
     );
   }
 
-  /* ---------- Valor medido (digitável + ditado por voz) ---------- */
+  /* ---------- Resultado da medição (Conforme / Não conforme) ---------- */
 
-  // Item que aparece logo após a foto do valor medido. O valor é digitado
-  // (ou ditado por voz) e define a conformidade na exportação: acima de 1000
-  // gera "NÃO CONFORME"; caso contrário, "CONFORME".
-  function montarValorMedido() {
-    const salvar = debounce(async (valor) => {
-      await atualizarRegistro(registro.id, { valorMedido: valor });
-      toast('Salvo.');
-    }, 500);
+  // Item que aparece logo após a foto do valor medido: o inspetor seleciona
+  // se o valor medido está conforme ou não conforme. Toca de novo para limpar.
+  function montarResultado() {
+    const opcoes = {
+      conforme: el('button', { class: 'btn-opcao', type: 'button' }, 'Conforme'),
+      nc: el('button', { class: 'btn-opcao', type: 'button' }, 'Não conforme'),
+    };
 
-    const campo = el('input', {
-      type: 'text',
-      inputmode: 'decimal',
-      placeholder: 'Ex.: 850',
-      value: registro.valorMedido ?? '',
-      disabled: somenteLeitura,
-      oninput: (evento) => salvar(evento.target.value),
-    });
+    function pintar() {
+      opcoes.conforme.classList.toggle('sel-conforme', registro.resultado === 'conforme');
+      opcoes.nc.classList.toggle('sel-nc', registro.resultado === 'nc');
+    }
+    pintar();
+
+    for (const [valor, botao] of Object.entries(opcoes)) {
+      botao.addEventListener('click', async () => {
+        if (somenteLeitura) {
+          toast('Inspeção finalizada — somente leitura.');
+          return;
+        }
+        registro.resultado = registro.resultado === valor ? null : valor;
+        await atualizarRegistro(registro.id, { resultado: registro.resultado });
+        pintar();
+        toast('Salvo.');
+      });
+    }
 
     return el(
       'section',
       { class: 'secao-registro' },
-      el('h2', {}, 'Valor medido em m'),
+      el('h2', {}, 'Resultado da medição'),
       el(
         'div',
         { class: 'item-checklist' },
-        el('div', { class: 'descricao' }, 'Informe o valor medido em m (obrigatório)'),
-        el(
-          'div',
-          { class: 'campo-medicao' },
-          campo,
-          somenteLeitura ? null : botaoDitado(campo),
-          el('span', { class: 'unidade' }, 'm')
-        )
+        el('div', { class: 'descricao' }, 'O valor medido está conforme?'),
+        el('div', { class: 'opcoes-status' }, opcoes.conforme, opcoes.nc)
       )
     );
   }
 
-  /* ---------- Resistência do prolongador (obrigatório, predefinido 0,8) ---------- */
+  /* ---------- Resistência do prolongador (obrigatório, predefinido 0,2) ---------- */
 
   function montarProlongador() {
     const salvar = debounce(async (valor) => {
@@ -224,18 +227,18 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
         'div',
         { class: 'item-checklist' },
         el('div', { class: 'descricao' }, 'Informe a resistência do prolongador (obrigatória)'),
-        el('div', { class: 'campo-medicao' }, campo, el('span', { class: 'unidade' }, 'm'))
+        el('div', { class: 'campo-medicao' }, campo, el('span', { class: 'unidade' }, 'Ω'))
       )
     );
   }
 
-  // Monta as seções de foto em ordem, inserindo o valor medido e a resistência
-  // do prolongador logo após a "Foto do valor medido" (categoria 02).
+  // Monta as seções de foto em ordem, inserindo o resultado da medição e a
+  // resistência do prolongador logo após a "Foto do valor medido" (categoria 02).
   const secoesFotos = [];
   for (const categoria of CATEGORIAS_FOTO) {
     secoesFotos.push(montarSecaoFotos(categoria));
     if (categoria.id === 'valor') {
-      secoesFotos.push(montarValorMedido());
+      secoesFotos.push(montarResultado());
       secoesFotos.push(montarProlongador());
     }
   }
