@@ -61,6 +61,7 @@ def gerar_todos(
             local=local,
             medicoes=medicoes,
             prolongador_padrao=config.prolongador_padrao,
+            logo_cliente=(config.logo_cliente or None),
         )
 
     if gerar_geral:

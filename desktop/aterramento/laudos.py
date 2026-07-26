@@ -18,6 +18,7 @@ import os
 import docx
 
 from .configuracao import Configuracao
+from .imagens import encaixar
 from .modelo import Equipamento, Pacote
 from .recursos import caminho_recurso
 
@@ -181,26 +182,6 @@ def _trocar_imagem(doc, inline_shape, caminho_foto: str) -> None:
     inline_shape.height = int(larg * h / w)
 
 
-def _blob_encaixado(caminho_novo: str, blob_original: bytes, formato: str) -> bytes:
-    """Encaixa a nova imagem na proporção da original (padding), evitando
-    distorção ao manter o mesmo tamanho de exibição do modelo."""
-    from PIL import Image
-
-    orig = Image.open(io.BytesIO(blob_original))
-    aw, ah = orig.size
-    nova = Image.open(caminho_novo).convert("RGBA")
-    nova.thumbnail((aw, ah), Image.LANCZOS)
-    fundo = (0, 0, 0, 0) if formato == "png" else (255, 255, 255, 255)
-    canvas = Image.new("RGBA", (aw, ah), fundo)
-    canvas.paste(nova, ((aw - nova.width) // 2, (ah - nova.height) // 2), nova)
-    buf = io.BytesIO()
-    if formato == "png":
-        canvas.save(buf, "PNG")
-    else:
-        canvas.convert("RGB").save(buf, "JPEG", quality=88)
-    return buf.getvalue()
-
-
 def _substituir_parte_imagem(doc, nome_parte: str, caminho_novo: str) -> bool:
     """Substitui o conteúdo da parte de imagem ``/word/media/<nome_parte>`` —
     atualiza todas as referências (capa e cabeçalhos compartilham a parte)."""
@@ -208,16 +189,19 @@ def _substituir_parte_imagem(doc, nome_parte: str, caminho_novo: str) -> bool:
     for part in doc.part.package.iter_parts():
         if str(part.partname) == alvo:
             formato = "png" if nome_parte.lower().endswith(".png") else "jpeg"
-            part._blob = _blob_encaixado(caminho_novo, part.blob, formato)
+            part._blob = encaixar(caminho_novo, part.blob, formato)
             return True
     return False
 
 
 def _aplicar_imagens_config(doc, config: Configuracao) -> None:
-    """(d)(e) Substitui logo do cliente, imagem do equipamento e selo de
-    calibração pelas imagens fornecidas na configuração (quando informadas)."""
+    """(d)(e) Substitui logo do cliente (capa e cabeçalhos), imagem do
+    equipamento e selo de calibração pelas imagens fornecidas na configuração."""
     if config.logo_cliente and os.path.exists(config.logo_cliente):
+        # image1.png: capa/cabeçalho (individual) e capa (geral).
         _substituir_parte_imagem(doc, "image1.png", config.logo_cliente)
+        # image9.png: logo do cabeçalho do laudo geral.
+        _substituir_parte_imagem(doc, "image9.png", config.logo_cliente)
     if config.imagem_equipamento and os.path.exists(config.imagem_equipamento):
         _substituir_parte_imagem(doc, "image2.jpeg", config.imagem_equipamento)
     if config.imagem_selo_calibracao and os.path.exists(config.imagem_selo_calibracao):

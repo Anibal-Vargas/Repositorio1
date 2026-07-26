@@ -507,6 +507,7 @@ class Aplicativo(tk.Tk):
         self.update_idletasks()
 
         gerar_pdf = bool(getattr(self, "var_pdf", None) and self.var_pdf.get())
+        self._pdf_solicitado = gerar_pdf
 
         def tarefa():
             try:
@@ -526,7 +527,14 @@ class Aplicativo(tk.Tk):
     def _dialogo_concluido(self, res):
         n = len(res["individuais"])
         n_pdf = len(res.get("pdfs", []))
-        pdf_linha = f"• {n_pdf} PDF(s)\n" if n_pdf else ""
+        if n_pdf:
+            pdf_linha = f"• {n_pdf} PDF(s)\n"
+        elif getattr(self, "_pdf_solicitado", False):
+            pdf_linha = ("• PDF: NÃO gerado — instale o LibreOffice (gratuito) ou\n"
+                         "  o Word/Excel + 'pip install pywin32'. Os arquivos\n"
+                         "  Word/Excel foram gerados normalmente.\n")
+        else:
+            pdf_linha = ""
         dlg = tk.Toplevel(self)
         dlg.title("Concluído")
         dlg.transient(self)

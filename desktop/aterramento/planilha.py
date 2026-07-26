@@ -16,16 +16,42 @@ Mapa de colunas do modelo (linha de dados começa em 10):
 
 from __future__ import annotations
 
+import io
 import os
 from copy import copy
 
 import openpyxl
 from openpyxl.styles import Border, PatternFill
 
+from .imagens import encaixar
 from .modelo import Pacote
 from .recursos import caminho_recurso
 
 MODELO_PADRAO = caminho_recurso("modelos", "Planilha_Medicoes_Padrao.xlsx")
+
+# Célula (mesclada G3:G5) onde fica o logo do cliente no modelo da planilha.
+_LOGO_COL, _LOGO_ROW = 6, 2  # G3 em índices 0-based (col=6, row=2)
+
+
+def _trocar_logo_g3(ws, caminho_logo: str) -> None:
+    """Substitui a imagem do logo (na célula mesclada G3) pela do cliente,
+    preservando posição e tamanho do modelo."""
+    from openpyxl.drawing.image import Image as XLImage
+
+    for i, img in enumerate(list(getattr(ws, "_images", []))):
+        ancora = getattr(img, "anchor", None)
+        de = getattr(ancora, "_from", None)
+        if de is not None and de.col == _LOGO_COL and de.row == _LOGO_ROW:
+            try:
+                original = img.ref.getvalue() if hasattr(img.ref, "getvalue") else None
+                if original is None:
+                    return
+                nova = XLImage(io.BytesIO(encaixar(caminho_logo, original, "png")))
+                nova.anchor = ancora  # reaproveita posição/tamanho do modelo
+                ws._images[i] = nova
+            except Exception:
+                pass
+            return
 
 LINHA_LOCAL = 5          # B5 = "Local: ..."  | D5 = "Data medições: ..."
 LINHA_DADOS_INICIO = 10  # primeira linha de máquina
@@ -46,6 +72,7 @@ def gerarPlanilhaResumo(
     data: str | None = None,
     medicoes: dict | None = None,
     prolongador_padrao: float = PROLONGADOR_PADRAO,
+    logo_cliente: str | None = None,
     modelo: str | None = None,
 ) -> str:
     """Gera a planilha resumo preenchendo o modelo.
@@ -117,12 +144,13 @@ def gerarPlanilhaResumo(
             for col in (5, 6, 7, 8):
                 ws.cell(r, col).value = None
 
-        obs = e.observacao or ""
-        if valor is None and not e.pendente:
-            obs = (obs + " " if obs else "") + "(valor medido não informado)"
-        elif e.pendente:
-            faltando = ", ".join(e.motivos_pendencia)
-            obs = (obs + " " if obs else "") + f"PENDENTE: {faltando}"
+        # Observação padrão pela adequação: "ESTÁ" -> em branco; "NÃO ESTÁ"
+        # (resistência efetiva > 1000 mΩ) -> "CORREÇÃO CONFORME FLUXOGRAMA".
+        obs = ""
+        if valor is not None:
+            efetiva = valor - (prolongador if prolongador is not None else 0)
+            if efetiva > 1000:
+                obs = "CORREÇÃO CONFORME FLUXOGRAMA"
         ws.cell(r, 9).value = obs
         ws.cell(r, 9).number_format = "General"
 
@@ -134,6 +162,10 @@ def gerarPlanilhaResumo(
             cell.value = None
             cell.border = Border()
             cell.fill = PatternFill()
+
+    # (b) Logo do cliente na célula mesclada G3.
+    if logo_cliente and os.path.exists(logo_cliente):
+        _trocar_logo_g3(ws, logo_cliente)
 
     os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
     wb.save(caminho_saida)
