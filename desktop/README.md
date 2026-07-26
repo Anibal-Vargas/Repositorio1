@@ -130,8 +130,23 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   abertura do `.zip`, cabeçalho editável, e por máquina o display ampliado +
   valor medido (confirmável) com prolongador/resultado pré-preenchidos; gera e
   salva na pasta escolhida. Rodar com `python iniciar_app.py`.
-- [ ] **Etapa 6b — PDF + empacotamento `.exe`** (Windows): conversão
-  `.docx → .pdf` (Word/LibreOffice) e geração do executável (PyInstaller).
+- [x] **Etapa 6b — PDF + empacotamento `.exe`**:
+  - **PDF** (`aterramento/pdf.py`): converte os documentos gerados marcando
+    "Gerar também em PDF" no app. Usa o MS Word/Excel (via `pywin32`) quando
+    instalados; senão, o LibreOffice (`soffice`). Se nenhum existir, os
+    documentos Word/Excel saem normalmente e o PDF é apenas pulado.
+  - **`.exe`** (`construir_exe.bat`): empacota o app num executável único com
+    PyInstaller (inclui os modelos e o logo). Rodar o `.bat` no Windows gera
+    `dist\RelatoriosAterramento.exe`.
+
+## Gerar o executável (.exe) e o PDF
+
+- **PDF**: no app, marque **"Gerar também em PDF"** antes de gerar. Para
+  funcionar, o Windows precisa ter **Word/Excel** (e `pip install pywin32`) ou
+  o **LibreOffice** (gratuito) instalado.
+- **.exe**: dê duplo clique em `construir_exe.bat` dentro da pasta `desktop`
+  (requer Python instalado). Ao final, o executável fica em
+  `dist\RelatoriosAterramento.exe` e roda sem precisar de Python.
 
 > Para as Etapas 2–4 são necessários os **modelos** do cliente
 > (planilha resumo, laudo geral, laudo individual). Coloque-os em

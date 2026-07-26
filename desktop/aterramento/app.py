@@ -22,6 +22,7 @@ from tkinter import filedialog, messagebox, ttk
 from .configuracao import Configuracao
 from .geracao import gerar_todos
 from .leitor import lerPacote, limparPacote
+from .recursos import caminho_recurso
 
 # Paleta Nord Consult.
 LARANJA = "#f08019"
@@ -386,7 +387,7 @@ class Aplicativo(tk.Tk):
         # Logomarca da Nord Consult.
         try:
             from PIL import Image, ImageTk
-            caminho = os.path.join(os.path.dirname(__file__), "logo-nord.png")
+            caminho = caminho_recurso("aterramento", "logo-nord.png")
             if os.path.exists(caminho):
                 img = Image.open(caminho)
                 img.thumbnail((360, 240))
@@ -440,7 +441,13 @@ class Aplicativo(tk.Tk):
 
         resumo = (f"{p.total} máquinas · {len(p.conformes)} conforme · "
                   f"{len(p.nao_conformes)} não conforme · {len(p.pendentes)} pendente(s)")
-        tk.Label(self.conteudo, text=resumo, bg=BRANCO, fg=CINZA).pack(anchor="w", padx=16)
+        linha_resumo = tk.Frame(self.conteudo, bg=BRANCO)
+        linha_resumo.pack(fill="x", padx=16)
+        tk.Label(linha_resumo, text=resumo, bg=BRANCO, fg=CINZA).pack(side="left")
+        self.var_pdf = tk.BooleanVar(value=False)
+        tk.Checkbutton(linha_resumo, text="Gerar também em PDF",
+                       variable=self.var_pdf, bg=BRANCO, fg=GRAFITE,
+                       activebackground=BRANCO, selectcolor=BRANCO).pack(side="right")
 
         container, interno = _frame_rolavel(self.conteudo)
         container.pack(fill="both", expand=True, padx=8, pady=8)
@@ -499,10 +506,13 @@ class Aplicativo(tk.Tk):
         self.btn_gerar.config(state="disabled", text="Gerando…")
         self.update_idletasks()
 
+        gerar_pdf = bool(getattr(self, "var_pdf", None) and self.var_pdf.get())
+
         def tarefa():
             try:
                 res = gerar_todos(self.pacote, self.config_obj,
-                                  self._data_medicoes(), medicoes, pasta)
+                                  self._data_medicoes(), medicoes, pasta,
+                                  gerar_pdf=gerar_pdf)
                 self.after(0, lambda: self._concluido(res))
             except Exception as e:
                 self.after(0, lambda: self._erro(e))
@@ -515,6 +525,8 @@ class Aplicativo(tk.Tk):
 
     def _dialogo_concluido(self, res):
         n = len(res["individuais"])
+        n_pdf = len(res.get("pdfs", []))
+        pdf_linha = f"• {n_pdf} PDF(s)\n" if n_pdf else ""
         dlg = tk.Toplevel(self)
         dlg.title("Concluído")
         dlg.transient(self)
@@ -525,7 +537,7 @@ class Aplicativo(tk.Tk):
                  font=("Segoe UI", 10),
                  text=(f"Documentos gerados em:\n{res['pasta']}\n\n"
                        f"• Planilha resumo\n• Laudo geral\n"
-                       f"• {n} laudo(s) individual(is)\n\n"
+                       f"• {n} laudo(s) individual(is)\n{pdf_linha}\n"
                        "O que deseja fazer agora?")).pack(anchor="w")
         botoes = tk.Frame(dlg, bg=BRANCO)
         botoes.pack(fill="x", padx=16, pady=(0, 16))

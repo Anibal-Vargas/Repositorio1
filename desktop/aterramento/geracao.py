@@ -12,6 +12,7 @@ import re
 from .configuracao import Configuracao
 from .laudos import gerarLaudoGeral, gerarLaudosIndividuais
 from .modelo import Pacote
+from .pdf import converter_para_pdf
 from .planilha import gerarPlanilhaResumo
 
 
@@ -33,6 +34,7 @@ def gerar_todos(
     gerar_planilha: bool = True,
     gerar_geral: bool = True,
     gerar_individuais: bool = True,
+    gerar_pdf: bool = False,
 ) -> dict:
     """Gera os documentos da inspeção em ``pasta_base``.
 
@@ -48,7 +50,8 @@ def gerar_todos(
         pasta = os.path.join(pasta_base, _seguro(f"{cliente} - {data_str}"))
     os.makedirs(pasta, exist_ok=True)
 
-    resultado = {"pasta": pasta, "planilha": None, "geral": None, "individuais": []}
+    resultado = {"pasta": pasta, "planilha": None, "geral": None,
+                 "individuais": [], "pdfs": []}
     base_nome = _seguro(f"{cliente} - {data_str}")
 
     if gerar_planilha:
@@ -76,5 +79,13 @@ def gerar_todos(
             medicoes,
             os.path.join(pasta, "Laudos Individuais"),
         )
+
+    if gerar_pdf:
+        docs = [resultado["planilha"], resultado["geral"], *resultado["individuais"]]
+        for doc in docs:
+            if doc:
+                pdf = converter_para_pdf(doc)
+                if pdf:
+                    resultado["pdfs"].append(pdf)
 
     return resultado

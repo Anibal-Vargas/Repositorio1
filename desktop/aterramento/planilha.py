@@ -23,10 +23,9 @@ import openpyxl
 from openpyxl.styles import Border, PatternFill
 
 from .modelo import Pacote
+from .recursos import caminho_recurso
 
-MODELO_PADRAO = os.path.join(
-    os.path.dirname(__file__), "..", "modelos", "Planilha_Medicoes_Padrao.xlsx"
-)
+MODELO_PADRAO = caminho_recurso("modelos", "Planilha_Medicoes_Padrao.xlsx")
 
 LINHA_LOCAL = 5          # B5 = "Local: ..."  | D5 = "Data medições: ..."
 LINHA_DADOS_INICIO = 10  # primeira linha de máquina

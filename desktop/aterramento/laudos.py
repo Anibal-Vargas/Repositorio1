@@ -19,13 +19,10 @@ import docx
 
 from .configuracao import Configuracao
 from .modelo import Equipamento, Pacote
+from .recursos import caminho_recurso
 
-MODELO_GERAL = os.path.join(
-    os.path.dirname(__file__), "..", "modelos", "Laudo_Geral_Padrao.docx"
-)
-MODELO_INDIVIDUAL = os.path.join(
-    os.path.dirname(__file__), "..", "modelos", "Laudo_Individual_Padrao.docx"
-)
+MODELO_GERAL = caminho_recurso("modelos", "Laudo_Geral_Padrao.docx")
+MODELO_INDIVIDUAL = caminho_recurso("modelos", "Laudo_Individual_Padrao.docx")
 
 _MESES = [
     "janeiro", "fevereiro", "março", "abril", "maio", "junho",
