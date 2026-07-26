@@ -211,7 +211,10 @@ def _ler_de_dados_json(diretorio: str, dados: dict) -> Pacote:
         # Campos que podem estar só nos .txt das pastas (o dados.json às vezes
         # não os traz): setor, prolongador e observação.
         setor = eq.get("setor") or _texto(os.path.join(pasta_abs, "setor.txt"))
-        prolongador = _num_ptbr(_texto(os.path.join(pasta_abs, "prolongador.txt")))
+        # Prolongador: do dados.json (resistenciaProlongador) ou de prolongador.txt.
+        prolongador = _num_generico(eq.get("resistenciaProlongador"))
+        if prolongador is None:
+            prolongador = _num_ptbr(_texto(os.path.join(pasta_abs, "prolongador.txt")))
         observacao = eq.get("observacao") or _texto(
             os.path.join(pasta_abs, "observação.txt")
         )
