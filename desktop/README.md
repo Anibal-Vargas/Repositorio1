@@ -45,10 +45,11 @@ no `dados.json` — vem sempre do `prolongador.txt` de cada pasta (decimal pt-BR
 varredura das pastas `Fotos/` (`resultado.txt`, `setor.txt`, `prolongador.txt`,
 `observação.txt`).
 
-O **valor medido (mΩ)** NÃO está no pacote: será lido da foto `02` por OCR (com
-revisão) ou digitado no app. Já os dados fixos do laudo que não vêm no pacote
-(contratante, nº da proposta, cidade, engenheiro) vêm da **configuração**
-preenchida uma vez.
+O **valor medido (mΩ)** agora vem no pacote (`.zip`) — o leitor procura o campo
+no `dados.json` (ex.: `valorMedido`) ou um arquivo de texto por pasta; no app
+o valor fica editável para conferência. Os dados fixos do laudo que não vêm no
+pacote (contratante, nº da proposta, cidade, engenheiro, imagens, data da
+inspeção) vêm da **configuração** preenchida uma vez.
 
 Uma máquina é **OK** apenas com as fotos 01 e 02 e o resultado marcado; caso
 contrário é **Pendente** (sinalizado nos relatórios).
@@ -60,7 +61,6 @@ desktop/
   aterramento/            pacote Python
     modelo.py             estruturas de dados (Cliente, Inspecao, Equipamento…)
     leitor.py             lerPacote(): .zip -> modelo de dados
-    ocr.py                localização/leitura do display (foto 02)
     configuracao.py       dados fixos preenchidos uma vez (JSON)
     planilha.py           gerarPlanilhaResumo(): .xlsx a partir do modelo
     laudos.py             gerarLaudoGeral() / gerarLaudosIndividuais(): .docx
@@ -109,13 +109,7 @@ pendentes) e a lista de máquinas por setor, com as pendências.
 - [x] **Etapa 2 — Planilha resumo** (`.xlsx`) — clona o modelo e preenche
   cabeçalho (Local/Data) e uma linha por máquina, preservando fórmulas
   (efetiva/adequado) e a formatação condicional. Valor medido e prolongador
-  entram como parâmetros (origem definida nas próximas etapas).
-- [~] **Etapa 2b — OCR do valor (foto 02)**: `aterramento/ocr.py`.
-  A **localização do display** do MILLIOHM 1 já é confiável (recorte ampliado
-  para revisão). O **reconhecimento dos dígitos** (7 segmentos) é
-  **experimental** — funciona nas fotos nítidas, mas precisa de um lote de
-  fotos reais para calibrar; por isso a leitura é sempre *sugestão* e passa
-  por confirmação do operador (nunca auto-aceita).
+  entram como parâmetros; o valor medido vem do pacote (`.zip`).
 - [x] **Etapa 3 — Laudo geral** (`.docx`): `laudos.gerarLaudoGeral()` preenche
   o modelo substituindo os campos variáveis (contratante, proposta, cidade,
   data, engenheiro) vindos da `Configuracao` (preenchida uma vez) + data da

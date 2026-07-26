@@ -6,8 +6,7 @@ formatação, as fórmulas (RESISTÊNCIA EFETIVA e ADEQUADO?) e a formatação
 condicional (verde/vermelho) do modelo.
 
 O valor medido (mΩ) e a resistência do prolongador entram como parâmetros
-(``medicoes``); a origem deles — OCR da foto 02, dado do .zip ou digitação no
-app — é resolvida por quem chama esta função.
+(``medicoes``); ambos vêm do pacote (.zip) e são confirmáveis no app.
 
 Mapa de colunas do modelo (linha de dados começa em 10):
     B ITEM · C MÁQUINA/EQUIPAMENTO · D SETOR · E VALOR MEDIDO (mΩ)

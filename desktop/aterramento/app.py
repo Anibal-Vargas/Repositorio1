@@ -274,7 +274,10 @@ class LinhaMaquina(tk.Frame):
         form.pack(anchor="w", pady=4)
         tk.Label(form, text="Valor medido (mΩ):", bg=BRANCO, fg=GRAFITE).grid(
             row=0, column=0, sticky="w")
-        self.var_valor = tk.StringVar()
+        # O valor medido vem do pacote (.zip); fica editável para conferência.
+        self.var_valor = tk.StringVar(
+            value=("" if equipamento.valor_medido is None
+                   else str(equipamento.valor_medido).replace(".", ",")))
         tk.Entry(form, textvariable=self.var_valor, width=10).grid(
             row=0, column=1, padx=4)
         tk.Label(form, text="Prolongador (mΩ):", bg=BRANCO, fg=GRAFITE).grid(
@@ -284,9 +287,6 @@ class LinhaMaquina(tk.Frame):
                    else str(equipamento.prolongador).replace(".", ",")))
         tk.Entry(form, textvariable=self.var_prol, width=8).grid(
             row=0, column=3, padx=4)
-
-        # Sugestão de OCR (apenas informativa; nunca preenche sozinha).
-        self._sugestao_ocr(dir_, equipamento)
 
     def _foto_valor(self):
         f = self.equipamento.fotos_valor
@@ -298,43 +298,19 @@ class LinhaMaquina(tk.Frame):
         img = None
         if caminho and os.path.exists(caminho):
             try:
-                from . import ocr
-                crop = ocr.localizarDisplay(caminho)
-                if crop is not None:
-                    img = Image.fromarray(crop[:, :, ::-1])  # BGR->RGB
+                img = Image.open(caminho)
             except Exception:
                 img = None
-            if img is None:
-                try:
-                    img = Image.open(caminho)
-                except Exception:
-                    img = None
         if img is None:
             tk.Label(pai, text="(sem foto 02)", bg="#f3f4f6", fg=CINZA,
                      width=30, height=6).pack()
             return
-        img.thumbnail((320, 200))
+        img.thumbnail((280, 180))
         foto = ImageTk.PhotoImage(img)
         self._imgref = foto
         tk.Label(pai, image=foto, bg=BRANCO).pack()
         tk.Label(pai, text="foto 02 — valor medido", bg=BRANCO, fg=CINZA,
                  font=("Segoe UI", 8)).pack()
-
-    def _sugestao_ocr(self, pai, equipamento):
-        caminho = self._foto_valor()
-        if not caminho or not os.path.exists(caminho):
-            return
-        try:
-            from . import ocr
-            if not ocr.DISPONIVEL:
-                return
-            r = ocr.lerValor(caminho)
-            if r.texto:
-                tk.Label(pai, text=f"Sugestão OCR (confira): {r.texto}",
-                         bg=BRANCO, fg=CINZA, font=("Segoe UI", 8, "italic")
-                         ).pack(anchor="w")
-        except Exception:
-            pass
 
     def valor(self):
         t = self.var_valor.get().strip().replace(",", ".")
@@ -376,11 +352,11 @@ class Aplicativo(tk.Tk):
         estilo = dict(bg=LARANJA, fg=BRANCO, font=("Segoe UI", 10, "bold"),
                       relief="flat", padx=16, pady=8,
                       activebackground=LARANJA_FORTE, activeforeground=BRANCO)
-        tk.Button(barra, text="Configuração", command=self._abrir_config,
+        tk.Button(barra, text="1 – Configurar relatórios", command=self._abrir_config,
                   **estilo).pack(side="left", padx=(8, 4), pady=8)
-        tk.Button(barra, text="Abrir pacote (.zip)", command=self._abrir_pacote,
+        tk.Button(barra, text="2 – Abrir pacote (.zip)", command=self._abrir_pacote,
                   **estilo).pack(side="left", padx=4, pady=8)
-        self.btn_gerar = tk.Button(barra, text="Gerar documentos",
+        self.btn_gerar = tk.Button(barra, text="3 – Gerar documentos",
                                    command=self._gerar, state="disabled", **estilo)
         self.btn_gerar.pack(side="left", padx=4, pady=8)
 
@@ -392,8 +368,19 @@ class Aplicativo(tk.Tk):
         for w in self.conteudo.winfo_children():
             w.destroy()
 
+    def _estilo_botao(self):
+        return dict(bg=LARANJA, fg=BRANCO, font=("Segoe UI", 10, "bold"),
+                    relief="flat", padx=16, pady=8,
+                    activebackground=LARANJA_FORTE, activeforeground=BRANCO)
+
     def _tela_inicial(self):
         self._limpar_conteudo()
+        # Botão "Sair" no canto inferior direito.
+        rodape = tk.Frame(self.conteudo, bg=BRANCO)
+        rodape.pack(side="bottom", fill="x")
+        tk.Button(rodape, text="Sair", command=self._sair,
+                  **self._estilo_botao()).pack(side="right", padx=12, pady=12)
+
         centro = tk.Frame(self.conteudo, bg=BRANCO)
         centro.pack(expand=True)
         # Logomarca da Nord Consult.
@@ -523,17 +510,59 @@ class Aplicativo(tk.Tk):
         threading.Thread(target=tarefa, daemon=True).start()
 
     def _concluido(self, res):
-        self.btn_gerar.config(state="normal", text="Gerar documentos")
+        self.btn_gerar.config(state="normal", text="3 – Gerar documentos")
+        self._dialogo_concluido(res)
+
+    def _dialogo_concluido(self, res):
         n = len(res["individuais"])
-        if messagebox.askyesno(
-                "Concluído",
-                f"Documentos gerados em:\n{res['pasta']}\n\n"
-                f"Planilha resumo, laudo geral e {n} laudo(s) individual(is).\n\n"
-                "Abrir a pasta?"):
-            self._abrir_pasta(res["pasta"])
+        dlg = tk.Toplevel(self)
+        dlg.title("Concluído")
+        dlg.transient(self)
+        dlg.grab_set()
+        dlg.configure(bg=BRANCO)
+        _cabecalho(dlg, "Relatórios gerados")
+        tk.Label(dlg, bg=BRANCO, fg=GRAFITE, justify="left", padx=20, pady=16,
+                 font=("Segoe UI", 10),
+                 text=(f"Documentos gerados em:\n{res['pasta']}\n\n"
+                       f"• Planilha resumo\n• Laudo geral\n"
+                       f"• {n} laudo(s) individual(is)\n\n"
+                       "O que deseja fazer agora?")).pack(anchor="w")
+        botoes = tk.Frame(dlg, bg=BRANCO)
+        botoes.pack(fill="x", padx=16, pady=(0, 16))
+
+        def gerar_mais():
+            dlg.destroy()
+            self._reiniciar()
+
+        def sair():
+            dlg.destroy()
+            self._sair()
+
+        tk.Button(botoes, text="Abrir pasta",
+                  command=lambda: self._abrir_pasta(res["pasta"]),
+                  **self._estilo_botao()).pack(side="left", padx=(0, 6))
+        tk.Button(botoes, text="Gerar mais relatórios", command=gerar_mais,
+                  **self._estilo_botao()).pack(side="left", padx=6)
+        tk.Button(botoes, text="Encerrar programa", command=sair,
+                  **self._estilo_botao()).pack(side="right")
+        dlg.focus_force()
+
+    def _reiniciar(self):
+        """Volta à tela inicial para processar um novo pacote."""
+        if self.pacote:
+            limparPacote(self.pacote)
+            self.pacote = None
+        self.linhas = []
+        self.btn_gerar.config(state="disabled")
+        self._tela_inicial()
+
+    def _sair(self):
+        if self.pacote:
+            limparPacote(self.pacote)
+        self.destroy()
 
     def _erro(self, e):
-        self.btn_gerar.config(state="normal", text="Gerar documentos")
+        self.btn_gerar.config(state="normal", text="3 – Gerar documentos")
         messagebox.showerror("Erro ao gerar", str(e))
 
     @staticmethod

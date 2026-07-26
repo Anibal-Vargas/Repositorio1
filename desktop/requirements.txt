@@ -3,9 +3,7 @@
 # (melhora as imagens do pacote de exemplo). As demais entram nas próximas
 # etapas (geração de documentos e empacotamento).
 
-Pillow>=10.0        # imagens (exemplo, redimensionamento p/ laudos)
-numpy>=1.26         # OCR do display (foto 02)                      [Etapa 2b]
-opencv-python-headless>=4.9  # localização/leitura do display       [Etapa 2b]
+Pillow>=10.0        # imagens (fotos nos laudos, logo na tela)
 openpyxl>=3.1       # planilha resumo (.xlsx) a partir do modelo  [Etapa 2]
 python-docx>=1.1    # laudos (.docx) a partir dos modelos          [Etapas 3-4]
 # docx2pdf>=0.1.8   # conversão .docx -> .pdf via MS Word (Windows) [Etapa 6]

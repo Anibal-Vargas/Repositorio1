@@ -42,7 +42,7 @@ class Equipamento:
     observacao: str = ""
     # Resistência do prolongador (PT), em mΩ, vinda de prolongador.txt.
     prolongador: float | None = None
-    # Valor medido (mΩ), preenchido por OCR/digitação (não vem do pacote).
+    # Valor medido (mΩ), lido do pacote (.zip) — editável/confirmável no app.
     valor_medido: float | None = None
     # Fotos por categoria -> caminhos absolutos no disco (após extração).
     fotos: dict[str, list[str]] = field(default_factory=dict)

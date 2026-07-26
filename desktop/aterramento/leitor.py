@@ -52,6 +52,42 @@ def _num_ptbr(texto: str) -> float | None:
         return None
 
 
+# Possíveis nomes do campo do valor medido no dados.json e em arquivo de texto.
+_CHAVES_VALOR_JSON = (
+    "valorMedido", "valor_medido", "valor", "medicao", "valorMohm",
+    "resistenciaMedida", "resistencia",
+)
+_ARQUIVOS_VALOR = (
+    "valor.txt", "valor medido.txt", "valor_medido.txt", "medicao.txt",
+    "valorMedido.txt",
+)
+
+
+def _num_generico(valor) -> float | None:
+    """Aceita número ou texto (pt-BR ou com ponto) e devolve float ou None."""
+    if valor is None:
+        return None
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    return _num_ptbr(str(valor))
+
+
+def _ler_valor_medido(pasta_abs: str, eq_json: dict | None) -> float | None:
+    """Lê o valor medido (mΩ) do dados.json (vários nomes de campo) ou de um
+    arquivo de texto na pasta da máquina."""
+    if eq_json:
+        for chave in _CHAVES_VALOR_JSON:
+            if chave in eq_json:
+                v = _num_generico(eq_json.get(chave))
+                if v is not None:
+                    return v
+    for nome in _ARQUIVOS_VALOR:
+        v = _num_ptbr(_texto(os.path.join(pasta_abs, nome)))
+        if v is not None:
+            return v
+    return None
+
+
 def _rotulo_resultado(texto: str | None) -> str | None:
     """Normaliza o resultado para o rótulo padrão dos relatórios."""
     if not texto:
@@ -188,6 +224,7 @@ def _ler_de_dados_json(diretorio: str, dados: dict) -> Pacote:
                 resultado_medicao=_rotulo_resultado(eq.get("resultadoMedicao")),
                 observacao=observacao,
                 prolongador=prolongador,
+                valor_medido=_ler_valor_medido(pasta_abs, eq),
                 fotos=_resolver_fotos(pasta_abs, eq.get("fotos")),
                 audios=_resolver_audios(pasta_abs, eq.get("audios")),
             )
@@ -225,6 +262,7 @@ def _ler_de_pastas(diretorio: str) -> Pacote:
                     resultado_medicao=resultado,
                     observacao=observacao,
                     prolongador=prolongador,
+                    valor_medido=_ler_valor_medido(pasta_abs, None),
                     fotos=_resolver_fotos(pasta_abs, None),
                     audios=_resolver_audios(pasta_abs, None),
                 )
