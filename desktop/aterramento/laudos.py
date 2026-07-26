@@ -318,8 +318,9 @@ def gerarLaudosIndividuais(
         valor = med.get("valor")
         if valor is None:
             continue
+        # Nome do arquivo = nome da máquina (sem o prefixo "Laudo - ").
         nome = _nome_arquivo_seguro(eq.nome) or f"equipamento-{eq.chave}"
-        caminho = os.path.join(pasta_saida, f"Laudo - {nome}.docx")
+        caminho = os.path.join(pasta_saida, f"{nome}.docx")
         gerarLaudoIndividual(
             eq, config, data_medicoes, valor, caminho,
             prolongador=med.get("prolongador"),
