@@ -94,6 +94,67 @@ def _aplicar_substituicoes(doc, substituicoes: dict) -> None:
                 _substituir_no_paragrafo(paragrafo, antigo, str(novo))
 
 
+def _ohm_do_documento(doc, padrao: str = "Ω") -> str:
+    """Descobre o caractere de ohm usado no documento (U+2126 ou U+03A9)."""
+    for p in doc.paragraphs:
+        for ch in p.text:
+            if ch in ("Ω", "Ω"):
+                return ch
+    return padrao
+
+
+def _prolongador_da_inspecao(pacote: Pacote, padrao: float, ohm: str) -> str:
+    """Texto do(s) valor(es) de prolongador da inspeção, com a unidade.
+
+    Normalmente é um único valor (o mesmo cabo em todas as medições); se o
+    pacote trouxer valores diferentes, todos são listados.
+    """
+    valores = sorted({
+        e.prolongador for e in pacote.equipamentos if e.prolongador is not None
+    })
+    if not valores:
+        valores = [padrao]
+    return " e ".join(f"{_fmt(v)}m{ohm}" for v in valores)
+
+
+def _linha_prolongador_geral(doc, texto_valor: str) -> None:
+    """Preenche a resistência do prolongador no laudo geral.
+
+    O modelo traz a frase que a anuncia, mas não a linha com o valor; ela é
+    inserida logo abaixo, com o mesmo estilo usado no laudo individual
+    (negrito, 14 pt, justificado).
+    """
+    from copy import deepcopy
+
+    from docx.shared import Pt
+    from docx.text.paragraph import Paragraph
+
+    texto = f"Resistência elétrica do cabo prolongador = {texto_valor}"
+    paragrafos = doc.paragraphs
+
+    # Se a linha já existir no modelo, apenas atualiza o texto.
+    for p in paragrafos:
+        if p.text.startswith("Resistência elétrica do cabo prolongador ="):
+            _substituir_no_paragrafo(p, p.text, texto)
+            return
+
+    marcador = "apresenta a seguinte resistência elétrica"
+    for p in paragrafos:
+        if marcador in p.text:
+            elemento = deepcopy(p._p)
+            p._p.addnext(elemento)
+            novo = Paragraph(elemento, p._parent)
+            for run in list(novo.runs)[1:]:
+                run._r.getparent().remove(run._r)
+            if not novo.runs:
+                novo.add_run("")
+            run = novo.runs[0]
+            run.text = texto
+            run.bold = True
+            run.font.size = Pt(14)
+            return
+
+
 # --- Laudo Geral ----------------------------------------------------------
 
 def gerarLaudoGeral(
@@ -129,6 +190,12 @@ def gerarLaudoGeral(
         subs["Planilha resumo de resultado das medições - "
              "Aurora Fábrica Ração – Guatambu.xlsx"] = nome_planilha
     _aplicar_substituicoes(doc, subs)
+    # Resistência do prolongador (valor vindo do pacote).
+    _linha_prolongador_geral(
+        doc,
+        _prolongador_da_inspecao(
+            pacote, config.prolongador_padrao, _ohm_do_documento(doc)),
+    )
     _aplicar_imagens_config(doc, config)  # logo, equipamento, selo
 
     os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
