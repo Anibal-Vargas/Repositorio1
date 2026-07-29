@@ -4,11 +4,13 @@
 # etapas (geração de documentos e empacotamento).
 
 Pillow>=10.0        # imagens (fotos nos laudos, logo na tela)
-openpyxl>=3.1       # planilha resumo (.xlsx) a partir do modelo  [Etapa 2]
-python-docx>=1.1    # laudos (.docx) a partir dos modelos          [Etapas 3-4]
+openpyxl>=3.1       # planilha resumo (.xlsx) a partir do modelo
+python-docx>=1.1    # laudos (.docx) a partir dos modelos
 
-# Opcionais:
-# pywin32           # PDF via MS Word/Excel no Windows (melhor fidelidade)  [Etapa 6b]
-#                   (alternativa gratuita: instalar o LibreOffice)
-# pyinstaller       # apenas para gerar o .exe (ver construir_exe.bat)      [Etapa 6b]
+# Geração dos PDFs pelo Word/Excel (Windows). Sem isto, o app depende do
+# LibreOffice estar instalado para conseguir gerar os PDFs.
+pywin32>=306; sys_platform == "win32"
+
+# Opcional:
+# pyinstaller       # apenas para gerar o .exe (ver construir_exe.bat)
 # pyinstaller>=6.0  # empacotamento em .exe                          [Etapa 6]

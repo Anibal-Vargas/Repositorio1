@@ -35,6 +35,9 @@ pyinstaller --noconfirm --onefile --windowed --name "RelatoriosAterramento" ^
   --add-data "modelos;modelos" ^
   --add-data "aterramento/logo-nord.png;aterramento" ^
   --hidden-import PIL._tkinter_finder ^
+  --hidden-import win32com.client ^
+  --hidden-import pythoncom ^
+  --hidden-import win32timezone ^
   iniciar_app.py
 
 echo.

@@ -91,7 +91,8 @@ python iniciar_app.py
 2. **Abrir pacote (.zip)** da inspeção. O app mostra um resumo (somente
    leitura) das máquinas com valor medido, prolongador, resistência efetiva e
    a adequação — tudo já vem do pacote, nada precisa ser digitado.
-3. **Gerar documentos** e escolha a pasta (pode ser a pasta de rede). Saem a
+3. **Gerar documentos** e escolha a pasta (pode ser a pasta de rede). Em
+   seguida o app pergunta se deve gerar também as **cópias em PDF**. Saem a
    planilha, o laudo geral e os laudos individuais organizados em subpasta.
 
 ## Como testar a leitura (Etapa 1)
@@ -133,19 +134,20 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   valor medido (confirmável) com prolongador/resultado pré-preenchidos; gera e
   salva na pasta escolhida. Rodar com `python iniciar_app.py`.
 - [x] **Etapa 6b — PDF + empacotamento `.exe`**:
-  - **PDF** (`aterramento/pdf.py`): converte os documentos gerados marcando
-    "Gerar também em PDF" no app. Usa o MS Word/Excel (via `pywin32`) quando
-    instalados; senão, o LibreOffice (`soffice`). Se nenhum existir, os
-    documentos Word/Excel saem normalmente e o PDF é apenas pulado.
+  - **PDF** (`aterramento/pdf.py`): o app pergunta, após a escolha da pasta,
+    se deve gerar as cópias em PDF. Usa o MS Word/Excel (via `pywin32`, já
+    incluído nas dependências) e, na ausência do Office, o LibreOffice
+    (`soffice`). Falhas são reportadas com o motivo.
   - **`.exe`** (`construir_exe.bat`): empacota o app num executável único com
     PyInstaller (inclui os modelos e o logo). Rodar o `.bat` no Windows gera
     `dist\RelatoriosAterramento.exe`.
 
 ## Gerar o executável (.exe) e o PDF
 
-- **PDF**: no app, marque **"Gerar também em PDF"** antes de gerar. Para
-  funcionar, o Windows precisa ter **Word/Excel** (e `pip install pywin32`) ou
-  o **LibreOffice** (gratuito) instalado.
+- **PDF**: ao gerar, o app pergunta se deve criar as cópias em PDF. A conversão
+  usa o **Word/Excel** (o `pywin32` já vem no `requirements.txt`) e, se não
+  houver Office, o **LibreOffice**. Se nenhum dos dois existir, o app avisa
+  antes de gerar e explica o que instalar.
 - **.exe**: dê duplo clique em `construir_exe.bat` dentro da pasta `desktop`
   (requer Python instalado). Ao final, o executável fica em
   `dist\RelatoriosAterramento.exe` e roda sem precisar de Python.

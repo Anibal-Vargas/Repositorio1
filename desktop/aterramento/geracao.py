@@ -85,11 +85,17 @@ def gerar_todos(
         )
 
     if gerar_pdf:
+        from . import pdf as _pdf
+
+        resultado["pdf_erro"] = None
         docs = [resultado["planilha"], resultado["geral"], *resultado["individuais"]]
         for doc in docs:
-            if doc:
-                pdf = converter_para_pdf(doc)
-                if pdf:
-                    resultado["pdfs"].append(pdf)
+            if not doc:
+                continue
+            convertido = converter_para_pdf(doc)
+            if convertido:
+                resultado["pdfs"].append(convertido)
+            elif resultado["pdf_erro"] is None:
+                resultado["pdf_erro"] = _pdf.ULTIMO_ERRO
 
     return resultado

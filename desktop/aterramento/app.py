@@ -19,6 +19,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from . import pdf
 from .configuracao import Configuracao
 from .geracao import gerar_todos
 from .leitor import lerPacote, limparPacote
@@ -361,6 +362,10 @@ class Aplicativo(tk.Tk):
             messagebox.showerror("Erro ao ler o pacote", str(e))
             return
         self._tela_inspecao()
+        messagebox.showinfo(
+            "Pacote aberto",
+            "Pacote aberto com sucesso! Ir para a etapa de geração de "
+            "relatórios.")
 
     def _tela_inspecao(self):
         """Resumo do pacote (somente leitura) — os valores já vêm no .zip."""
@@ -380,10 +385,6 @@ class Aplicativo(tk.Tk):
         linha_resumo = tk.Frame(self.conteudo, bg=BRANCO)
         linha_resumo.pack(fill="x", padx=16, pady=(0, 6))
         tk.Label(linha_resumo, text=resumo, bg=BRANCO, fg=CINZA).pack(side="left")
-        self.var_pdf = tk.BooleanVar(value=False)
-        tk.Checkbutton(linha_resumo, text="Gerar também em PDF",
-                       variable=self.var_pdf, bg=BRANCO, fg=GRAFITE,
-                       activebackground=BRANCO, selectcolor=BRANCO).pack(side="right")
 
         # Cabeçalho da tabela.
         cabtab = tk.Frame(self.conteudo, bg="#f3f4f6")
@@ -453,10 +454,24 @@ class Aplicativo(tk.Tk):
         if not pasta:
             return
 
+        # Pergunta se deve gerar também as cópias em PDF.
+        gerar_pdf = messagebox.askyesno(
+            "Cópia em PDF",
+            "Deseja gerar também uma cópia em PDF dos laudos e da planilha?")
+        if gerar_pdf and not pdf.disponivel():
+            continuar = messagebox.askyesno(
+                "PDF indisponível",
+                "Não foi encontrado um conversor de PDF neste computador.\n\n"
+                + pdf.como_habilitar()
+                + "\n\nDeseja continuar mesmo assim, gerando apenas os "
+                  "arquivos Word/Excel?")
+            if not continuar:
+                return
+            gerar_pdf = False
+
         self.btn_gerar.config(state="disabled", text="Gerando…")
         self.update_idletasks()
 
-        gerar_pdf = bool(getattr(self, "var_pdf", None) and self.var_pdf.get())
         self._pdf_solicitado = gerar_pdf
 
         def tarefa():
@@ -480,9 +495,9 @@ class Aplicativo(tk.Tk):
         if n_pdf:
             pdf_linha = f"• {n_pdf} PDF(s)\n"
         elif getattr(self, "_pdf_solicitado", False):
-            pdf_linha = ("• PDF: NÃO gerado — instale o LibreOffice (gratuito) ou\n"
-                         "  o Word/Excel + 'pip install pywin32'. Os arquivos\n"
-                         "  Word/Excel foram gerados normalmente.\n")
+            motivo = res.get("pdf_erro") or "conversor indisponível"
+            pdf_linha = (f"• PDF: NÃO gerado ({motivo}).\n"
+                         "  Os arquivos Word/Excel foram gerados normalmente.\n")
         else:
             pdf_linha = ""
         dlg = tk.Toplevel(self)
