@@ -36,9 +36,8 @@ def data_por_extenso(dt) -> str:
 
 
 def _fmt(valor: float) -> str:
-    """Formata número em pt-BR sem casas desnecessárias (57.4 -> '57,4')."""
-    texto = f"{valor:.1f}".rstrip("0").rstrip(".")
-    return texto.replace(".", ",")
+    """Formata número em pt-BR com uma casa decimal (57.4 -> '57,4')."""
+    return f"{valor:.1f}".replace(".", ",")
 
 
 # --- Substituição robusta de texto (atravessa runs) ----------------------
@@ -103,43 +102,34 @@ def gerarLaudoGeral(
     data_medicoes,
     caminho_saida: str,
     modelo: str | None = None,
+    nome_planilha: str | None = None,
 ) -> str:
     """Gera o laudo geral (.docx) preenchendo o modelo.
 
     ``data_medicoes`` é um ``datetime.date`` (ou date-like) da inspeção.
+    ``nome_planilha`` é o nome do arquivo da planilha resumo anexa (citado no
+    corpo do laudo).
     """
     doc = docx.Document(modelo or MODELO_GERAL)
-    data_curta = f"{data_medicoes.day:02d}/{data_medicoes.month:02d}/{data_medicoes.year}"
     data_ext = data_por_extenso(data_medicoes)
 
     subs = {
-        # Contratante (seção 3)
-        "Cooperativa Central Oeste Catarinense - Incubatório": config.contratante_nome,
-        "RS - Rua Virgínio Basso, 13 - Ibiaçá, RS": config.contratante_endereco,
-        "Cep: RS, 99940-000": f"Cep: {config.contratante_cep}",
-        "Fone: (54) 9 144-5768": f"Fone: {config.contratante_fone}",
-        "E-mail: daiane-almeida@auroracoop.com.br": f"E-mail: {config.contratante_email}",
-        "CNPJ: 83.310.441/0099-20": f"CNPJ: {config.contratante_cnpj}",
-        # Objetivos (descrição do contratante no texto)
-        "Aurora, unidade Incubatório – Ibiaçá – Rs": config.contratante_descricao,
+        # Capa
+        "UNIDADE: INCUBATÓRIO – AURORA CHAPECÓ - SC": f"UNIDADE: {config.unidade}",
+        "Chapecó – SC, 24 de julho de 2026": f"{config.cidade}, {data_ext}",
         # Engenheiro
         "Aníbal Rosa Vargas": config.engenheiro,
         "CREA-SC – 069788-5": f"CREA-SC – {config.crea}",
-        # Proposta e capa
-        "018PC26AUR": config.proposta,
-        "COOPERATIVA CENTRAL AURORA ALIMENTOS": config.capa_linha_razao,
-        "UNIDADE CATARINENSE – INCUBATÓRIO": config.capa_linha_unidade,
-        "IBIACÁ - RS": config.capa_linha_local,
-        "Chapecó - SC, 09 de março de 2026": f"{config.cidade}, {data_ext}",
-        # Datas das medições
-        "09/03/2026": data_curta,
-        # (f) Certificado de calibração — data e validade
-        "Aferição 20/03/2025 e validade da medição de 01 ano":
-            f"Aferição {config.calibracao_data} e validade do certificado até "
-            f"{config.calibracao_validade}",
+        # Certificado de calibração — data e validade
+        "certificado de calibração pelo fabricante na data 30/03/2026":
+            f"certificado de calibração pelo fabricante na data "
+            f"{config.calibracao_data}, com validade até {config.calibracao_validade}",
     }
+    if nome_planilha:
+        subs["Planilha resumo de resultado das medições - "
+             "Aurora Fábrica Ração – Guatambu.xlsx"] = nome_planilha
     _aplicar_substituicoes(doc, subs)
-    _aplicar_imagens_config(doc, config)  # (d)(e) logo, equipamento, selo
+    _aplicar_imagens_config(doc, config)  # logo, equipamento, selo
 
     os.makedirs(os.path.dirname(os.path.abspath(caminho_saida)), exist_ok=True)
     doc.save(caminho_saida)
@@ -155,31 +145,53 @@ def _nome_arquivo_seguro(texto: str) -> str:
 LIMITE_ADEQUADO = 1000.0  # mΩ (efetiva ≤ 1000 -> ESTÁ / adequado)
 
 
-def _preparar_imagem(caminho: str, formato: str, max_lado: int = 1200, q: int = 85):
-    """Redimensiona e reencoda a foto no formato do placeholder. Devolve
-    (bytes, (largura, altura))."""
+# Tamanho fixo das fotos do laudo individual (Figuras 2 e 3).
+FOTO_LARGURA_CM = 8.0
+FOTO_ALTURA_CM = 10.0
+
+
+def _preparar_foto(caminho: str, formato: str, proporcao: float,
+                   max_lado: int = 1400, q: int = 85) -> bytes:
+    """Prepara a foto para ser exibida num quadro de proporção fixa.
+
+    A imagem é encaixada (com preenchimento branco) na ``proporcao``
+    ``largura/altura`` desejada, de modo que ao fixar largura e altura no Word
+    ela não apareça distorcida.
+    """
     from PIL import Image
 
     im = Image.open(caminho).convert("RGB")
     w, h = im.size
     if max(w, h) > max_lado:
         f = max_lado / max(w, h)
-        im = im.resize((max(1, int(w * f)), max(1, int(h * f))))
+        im = im.resize((max(1, int(w * f)), max(1, int(h * f))), Image.LANCZOS)
+        w, h = im.size
+
+    # Quadro na proporção desejada, cobrindo a imagem inteira.
+    if w / h > proporcao:          # imagem mais larga que o quadro
+        quadro = (w, max(1, int(round(w / proporcao))))
+    else:                          # imagem mais alta que o quadro
+        quadro = (max(1, int(round(h * proporcao))), h)
+    canvas = Image.new("RGB", quadro, (255, 255, 255))
+    canvas.paste(im, ((quadro[0] - w) // 2, (quadro[1] - h) // 2))
+
     buf = io.BytesIO()
-    im.save(buf, "PNG" if formato == "png" else "JPEG", quality=q)
-    return buf.getvalue(), im.size
+    canvas.save(buf, "PNG" if formato == "png" else "JPEG", quality=q)
+    return buf.getvalue()
 
 
 def _trocar_imagem(doc, inline_shape, caminho_foto: str) -> None:
-    """Substitui a imagem de um inline shape pela foto, preservando a largura
-    do placeholder e ajustando a altura para manter o aspecto."""
+    """Substitui a imagem de um inline shape pela foto, fixando o tamanho em
+    ``FOTO_LARGURA_CM`` x ``FOTO_ALTURA_CM`` (sem distorcer o conteúdo)."""
+    from docx.shared import Cm
+
     rId = inline_shape._inline.graphic.graphicData.pic.blipFill.blip.embed
     parte = doc.part.related_parts[rId]
     formato = "png" if "png" in (parte.content_type or "") else "jpeg"
-    blob, (w, h) = _preparar_imagem(caminho_foto, formato)
-    parte._blob = blob
-    larg = inline_shape.width
-    inline_shape.height = int(larg * h / w)
+    proporcao = FOTO_LARGURA_CM / FOTO_ALTURA_CM
+    parte._blob = _preparar_foto(caminho_foto, formato, proporcao)
+    inline_shape.width = Cm(FOTO_LARGURA_CM)
+    inline_shape.height = Cm(FOTO_ALTURA_CM)
 
 
 def _substituir_parte_imagem(doc, nome_parte: str, caminho_novo: str) -> bool:
@@ -237,15 +249,15 @@ def gerarLaudoIndividual(
 
     subs = {
         # Capa
-        "COOPERATIVA CENTRAL – INCUBATÓRIO IBIAÇÁ - RS": config.capa_ind_unidade,
-        "INCUBATÓRIO IBIAÇÁ - RS": config.capa_ind_local,
-        "INCUBADORA 48": nome_upper,
-        "Chapecó – SC, 09 de março de 2026": f"{config.cidade}, {data_ext}",
+        "UNIDADE: AURORA - INCUBATÓRIO BORMANN – CHAPECO - SC":
+            f"UNIDADE: {config.unidade}",
+        "INCUBADORA 2": nome_upper,
+        "Chapecó – SC, 24 de julho de 2026": f"{config.cidade}, {data_ext}",
         # Engenheiro
         "Aníbal Rosa Vargas": config.engenheiro,
         "CREA-SC – 069788-5": f"CREA-SC – {config.crea}",
-        # (f) Certificado de calibração — data e validade
-        "certificado de calibração pelo fabricante na data 20/03/2025":
+        # Certificado de calibração — data e validade
+        "certificado de calibração pelo fabricante na data 30/03/2026":
             f"certificado de calibração pelo fabricante na data "
             f"{config.calibracao_data}, com validade até {config.calibracao_validade}",
     }
@@ -256,6 +268,7 @@ def gerarLaudoIndividual(
         "Valor medido = ": _fmt(valor_medido),
         "Resistência elétrica do cabo prolongador PT = ": _fmt(prolongador),
         "Resistência elétrica de aterramento efetiva = ": _fmt(efetiva),
+        "Resistência elétrica do cabo prolongador = ": _fmt(prolongador),
     }
     for p in doc.paragraphs:
         for prefixo, valor in medicao.items():

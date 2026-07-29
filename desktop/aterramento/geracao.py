@@ -65,11 +65,14 @@ def gerar_todos(
         )
 
     if gerar_geral:
+        nome_planilha = (os.path.basename(resultado["planilha"])
+                         if resultado["planilha"] else None)
         resultado["geral"] = gerarLaudoGeral(
             pacote,
             config,
             data_medicoes,
             os.path.join(pasta, f"Laudo Geral - {base_nome}.docx"),
+            nome_planilha=nome_planilha,
         )
 
     if gerar_individuais:

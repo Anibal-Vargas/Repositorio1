@@ -84,11 +84,13 @@ cd desktop
 python iniciar_app.py
 ```
 
-1. **Configuração** (uma vez): preencha contratante, proposta, cidade,
-   engenheiro, as **imagens** (logo do cliente, equipamento, selo de calibração)
-   e as datas da calibração. Fica salvo em `~/.aterramento/config.json`.
-2. **Abrir pacote (.zip)** da inspeção. Confira cliente/inspetor/data e, por
-   máquina, veja o **display ampliado** e informe/confirme o **valor medido**.
+1. **Configuração** (uma vez): preencha data da inspeção, unidade, cidade,
+   engenheiro/CREA, as **imagens** (logo do cliente, equipamento, selo de
+   calibração) e as datas da calibração. Fica salvo em
+   `~/.aterramento/config.json`.
+2. **Abrir pacote (.zip)** da inspeção. O app mostra um resumo (somente
+   leitura) das máquinas com valor medido, prolongador, resistência efetiva e
+   a adequação — tudo já vem do pacote, nada precisa ser digitado.
 3. **Gerar documentos** e escolha a pasta (pode ser a pasta de rede). Saem a
    planilha, o laudo geral e os laudos individuais organizados em subpasta.
 

@@ -46,30 +46,12 @@ TITULO_JANELA = ("Medição de continuidade de aterramento elétrico de "
 GRUPOS_CONFIG = [
     ("Inspeção", [
         ("data_inspecao", "Data da inspeção (dd/mm/aaaa)"),
+        ("unidade", "Unidade (capa dos laudos)"),
     ]),
     ("Empresa responsável (Nord)", [
         ("engenheiro", "Engenheiro responsável"),
         ("crea", "CREA"),
-    ]),
-    ("Contratante", [
-        ("contratante_nome", "Nome do contratante"),
-        ("contratante_endereco", "Endereço"),
-        ("contratante_cep", "CEP"),
-        ("contratante_fone", "Telefone"),
-        ("contratante_email", "E-mail"),
-        ("contratante_cnpj", "CNPJ"),
-        ("contratante_descricao", "Descrição (texto de objetivos)"),
-    ]),
-    ("Capa — laudo geral", [
-        ("capa_linha_razao", "Razão social (linha 1)"),
-        ("capa_linha_unidade", "Unidade (linha 2)"),
-        ("capa_linha_local", "Local (linha 3)"),
-        ("proposta", "Nº da proposta"),
-        ("cidade", "Cidade (dateline)"),
-    ]),
-    ("Capa — laudo individual", [
-        ("capa_ind_local", "Local (título)"),
-        ("capa_ind_unidade", "Unidade"),
+        ("cidade", "Cidade (assinatura)"),
     ]),
     ("Certificado de calibração", [
         ("calibracao_data", "Data de aferição"),
@@ -245,87 +227,47 @@ class JanelaConfig(tk.Toplevel):
 
 
 # ---------------------------------------------------------------------------
-# Linha de uma máquina (na inspeção)
+# Resumo (somente leitura) das máquinas do pacote
 # ---------------------------------------------------------------------------
 
-class LinhaMaquina(tk.Frame):
-    def __init__(self, pai, equipamento, config):
-        super().__init__(pai, bg=BRANCO, highlightbackground="#e5e7eb",
-                         highlightthickness=1)
+LIMITE_ADEQUADO = 1000.0  # mΩ
+
+
+def _fmt_num(v) -> str:
+    if v is None:
+        return "—"
+    return f"{v:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
+class LinhaResumo(tk.Frame):
+    """Uma linha da tabela de resumo: os valores vêm prontos do pacote."""
+
+    def __init__(self, pai, equipamento, indice):
+        fundo = BRANCO if indice % 2 == 0 else "#fafafa"
+        super().__init__(pai, bg=fundo)
         self.equipamento = equipamento
-        self._imgref = None  # mantém referência da PhotoImage
 
-        esq = tk.Frame(self, bg=BRANCO)
-        esq.pack(side="left", padx=8, pady=8)
-        self._mostrar_display(esq, equipamento)
+        valor = equipamento.valor_medido
+        prol = equipamento.prolongador
+        efetiva = None if valor is None else valor - (prol or 0)
+        if efetiva is None:
+            situacao, cor = "sem valor", CINZA
+        elif efetiva <= LIMITE_ADEQUADO:
+            situacao, cor = "ESTÁ", VERDE
+        else:
+            situacao, cor = "NÃO ESTÁ", VERMELHO
 
-        dir_ = tk.Frame(self, bg=BRANCO)
-        dir_.pack(side="left", fill="both", expand=True, padx=8, pady=8)
-
-        estado = "Pendente" if equipamento.pendente else (
-            equipamento.resultado_medicao or "—")
-        cor = VERMELHO if equipamento.pendente else (
-            VERDE if equipamento.conforme else (VERMELHO if equipamento.conforme is False else CINZA))
-        tk.Label(dir_, text=equipamento.nome, bg=BRANCO, fg=GRAFITE,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        tk.Label(dir_, text=f"Setor: {equipamento.setor or '—'}   ·   PWA: {estado}",
-                 bg=BRANCO, fg=cor).pack(anchor="w")
-
-        form = tk.Frame(dir_, bg=BRANCO)
-        form.pack(anchor="w", pady=4)
-        tk.Label(form, text="Valor medido (mΩ):", bg=BRANCO, fg=GRAFITE).grid(
-            row=0, column=0, sticky="w")
-        # O valor medido vem do pacote (.zip); fica editável para conferência.
-        self.var_valor = tk.StringVar(
-            value=("" if equipamento.valor_medido is None
-                   else str(equipamento.valor_medido).replace(".", ",")))
-        tk.Entry(form, textvariable=self.var_valor, width=10).grid(
-            row=0, column=1, padx=4)
-        tk.Label(form, text="Prolongador (mΩ):", bg=BRANCO, fg=GRAFITE).grid(
-            row=0, column=2, sticky="w", padx=(12, 0))
-        self.var_prol = tk.StringVar(
-            value=("" if equipamento.prolongador is None
-                   else str(equipamento.prolongador).replace(".", ",")))
-        tk.Entry(form, textvariable=self.var_prol, width=8).grid(
-            row=0, column=3, padx=4)
-
-    def _foto_valor(self):
-        f = self.equipamento.fotos_valor
-        return f[0] if f else None
-
-    def _mostrar_display(self, pai, equipamento):
-        from PIL import Image, ImageTk
-        caminho = self._foto_valor()
-        img = None
-        if caminho and os.path.exists(caminho):
-            try:
-                img = Image.open(caminho)
-            except Exception:
-                img = None
-        if img is None:
-            tk.Label(pai, text="(sem foto 02)", bg="#f3f4f6", fg=CINZA,
-                     width=30, height=6).pack()
-            return
-        img.thumbnail((280, 180))
-        foto = ImageTk.PhotoImage(img)
-        self._imgref = foto
-        tk.Label(pai, image=foto, bg=BRANCO).pack()
-        tk.Label(pai, text="foto 02 — valor medido", bg=BRANCO, fg=CINZA,
-                 font=("Segoe UI", 8)).pack()
-
-    def valor(self):
-        t = self.var_valor.get().strip().replace(",", ".")
-        try:
-            return float(t)
-        except ValueError:
-            return None
-
-    def prolongador(self):
-        t = self.var_prol.get().strip().replace(",", ".")
-        try:
-            return float(t)
-        except ValueError:
-            return None
+        colunas = [
+            (equipamento.nome, 32, "w", GRAFITE),
+            (equipamento.setor or "—", 22, "w", CINZA),
+            (_fmt_num(valor), 10, "center", GRAFITE),
+            (_fmt_num(prol), 10, "center", GRAFITE),
+            (_fmt_num(efetiva), 10, "center", GRAFITE),
+            (situacao, 10, "center", cor),
+        ]
+        for texto, larg, ancora, fg in colunas:
+            tk.Label(self, text=texto, bg=fundo, fg=fg, width=larg,
+                     anchor=ancora).pack(side="left", padx=2, pady=3)
 
 
 # ---------------------------------------------------------------------------
@@ -421,41 +363,51 @@ class Aplicativo(tk.Tk):
         self._tela_inspecao()
 
     def _tela_inspecao(self):
+        """Resumo do pacote (somente leitura) — os valores já vêm no .zip."""
         self._limpar_conteudo()
         p = self.pacote
 
         cab = tk.Frame(self.conteudo, bg=BRANCO)
-        cab.pack(fill="x", padx=12, pady=8)
-        self.var_cliente = tk.StringVar(value=p.cliente.nome or "")
-        self.var_inspetor = tk.StringVar(value=p.inspecao.inspetor or "")
-        for i, (rot, var, larg) in enumerate([
-                ("Cliente", self.var_cliente, 28),
-                ("Inspetor", self.var_inspetor, 22)]):
-            tk.Label(cab, text=rot + ":", bg=BRANCO, fg=GRAFITE).grid(
-                row=0, column=i * 2, sticky="w", padx=(8, 2))
-            tk.Entry(cab, textvariable=var, width=larg).grid(
-                row=0, column=i * 2 + 1, padx=(0, 8))
-        tk.Label(cab, text=f"Data da inspeção: {self.config_obj.data_inspecao or '—'} "
-                          "(definida na Configuração)",
-                 bg=BRANCO, fg=CINZA).grid(row=0, column=4, sticky="w", padx=(12, 0))
+        cab.pack(fill="x", padx=16, pady=(10, 4))
+        info = (f"Cliente: {p.cliente.nome or '—'}     "
+                f"Inspetor: {p.inspecao.inspetor or '—'}     "
+                f"Data da inspeção: {self.config_obj.data_inspecao or '—'}")
+        tk.Label(cab, text=info, bg=BRANCO, fg=GRAFITE,
+                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
 
         resumo = (f"{p.total} máquinas · {len(p.conformes)} conforme · "
-                  f"{len(p.nao_conformes)} não conforme · {len(p.pendentes)} pendente(s)")
+                  f"{len(p.nao_conformes)} não conforme")
         linha_resumo = tk.Frame(self.conteudo, bg=BRANCO)
-        linha_resumo.pack(fill="x", padx=16)
+        linha_resumo.pack(fill="x", padx=16, pady=(0, 6))
         tk.Label(linha_resumo, text=resumo, bg=BRANCO, fg=CINZA).pack(side="left")
         self.var_pdf = tk.BooleanVar(value=False)
         tk.Checkbutton(linha_resumo, text="Gerar também em PDF",
                        variable=self.var_pdf, bg=BRANCO, fg=GRAFITE,
                        activebackground=BRANCO, selectcolor=BRANCO).pack(side="right")
 
+        # Cabeçalho da tabela.
+        cabtab = tk.Frame(self.conteudo, bg="#f3f4f6")
+        cabtab.pack(fill="x", padx=14)
+        for texto, larg, anc in [
+                ("MÁQUINA/EQUIPAMENTO", 32, "w"), ("SETOR", 22, "w"),
+                ("VALOR (mΩ)", 10, "center"), ("PROLONG.", 10, "center"),
+                ("EFETIVA", 10, "center"), ("ADEQUADO?", 10, "center")]:
+            tk.Label(cabtab, text=texto, bg="#f3f4f6", fg=GRAFITE, width=larg,
+                     anchor=anc, font=("Segoe UI", 8, "bold")).pack(
+                         side="left", padx=2, pady=4)
+
         container, interno = _frame_rolavel(self.conteudo)
-        container.pack(fill="both", expand=True, padx=8, pady=8)
+        container.pack(fill="both", expand=True, padx=14, pady=(0, 8))
         self.linhas = []
-        for eq in p.equipamentos:
-            linha = LinhaMaquina(interno, eq, self.config_obj)
-            linha.pack(fill="x", padx=6, pady=4)
+        for i, eq in enumerate(p.equipamentos):
+            linha = LinhaResumo(interno, eq, i)
+            linha.pack(fill="x")
             self.linhas.append(linha)
+
+        tk.Label(self.conteudo,
+                 text="Os valores acima vêm do pacote. Clique em "
+                      "\"3 – Gerar documentos\" para produzir os relatórios.",
+                 bg=BRANCO, fg=CINZA, font=("Segoe UI", 9)).pack(pady=(0, 8))
 
         self.btn_gerar.config(state="normal")
 
@@ -471,25 +423,27 @@ class Aplicativo(tk.Tk):
         return d.date() if d else datetime.date.today()
 
     def _gerar(self):
-        # Monta as medições a partir dos campos.
+        # Os valores vêm prontos do pacote (.zip).
         medicoes = {}
         sem_valor = []
-        for linha in self.linhas:
-            v = linha.valor()
-            if v is None:
-                sem_valor.append(linha.equipamento.nome)
+        for eq in self.pacote.equipamentos:
+            if eq.valor_medido is None:
+                sem_valor.append(eq.nome)
                 continue
-            medicoes[linha.equipamento.chave] = {
-                "valor": v, "prolongador": linha.prolongador()}
+            medicoes[eq.chave] = {"valor": eq.valor_medido,
+                                  "prolongador": eq.prolongador}
         if not medicoes:
             messagebox.showwarning(
-                "Sem valores", "Informe o valor medido de ao menos uma máquina.")
+                "Sem valores",
+                "Nenhuma máquina do pacote tem valor medido. Verifique se o "
+                "pacote foi exportado por uma versão do aplicativo de campo "
+                "que grava o valor medido.")
             return
         if sem_valor:
             ok = messagebox.askyesno(
                 "Máquinas sem valor",
-                "Estas máquinas ficarão sem valor (não entram nos laudos "
-                "individuais e ficam em branco na planilha):\n\n- "
+                "Estas máquinas não têm valor medido no pacote (não entram nos "
+                "laudos individuais e ficam em branco na planilha):\n\n- "
                 + "\n- ".join(sem_valor) + "\n\nContinuar?")
             if not ok:
                 return
@@ -498,10 +452,6 @@ class Aplicativo(tk.Tk):
             title="Escolha a pasta para salvar os laudos e planilha")
         if not pasta:
             return
-
-        # Atualiza cliente/inspetor conforme editado.
-        self.pacote.cliente.nome = self.var_cliente.get().strip()
-        self.pacote.inspecao.inspetor = self.var_inspetor.get().strip()
 
         self.btn_gerar.config(state="disabled", text="Gerando…")
         self.update_idletasks()
