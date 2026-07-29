@@ -103,26 +103,31 @@ def _ohm_do_documento(doc, padrao: str = "Ω") -> str:
     return padrao
 
 
-def _prolongador_da_inspecao(pacote: Pacote, padrao: float, ohm: str) -> str:
-    """Texto do(s) valor(es) de prolongador da inspeção, com a unidade.
+# Frase usada no laudo geral quando há mais de um valor de prolongador.
+FRASE_PROLONGADOR_PLURAL = (
+    "Os cabos prolongadores utilizados apresentam as seguintes "
+    "resistências elétricas:"
+)
 
-    Normalmente é um único valor (o mesmo cabo em todas as medições); se o
-    pacote trouxer valores diferentes, todos são listados.
+
+def _prolongadores_da_inspecao(pacote: Pacote, padrao: float) -> list[float]:
+    """Valores distintos de prolongador da inspeção (ordenados).
+
+    Normalmente é um único valor (o mesmo cabo em todas as medições).
     """
     valores = sorted({
         e.prolongador for e in pacote.equipamentos if e.prolongador is not None
     })
-    if not valores:
-        valores = [padrao]
-    return " e ".join(f"{_fmt(v)}m{ohm}" for v in valores)
+    return valores or [padrao]
 
 
-def _linha_prolongador_geral(doc, texto_valor: str) -> None:
+def _linha_prolongador_geral(doc, texto_valor: str, plural: bool = False) -> None:
     """Preenche a resistência do prolongador no laudo geral.
 
     O modelo traz a frase que a anuncia, mas não a linha com o valor; ela é
     inserida logo abaixo, com o mesmo estilo usado no laudo individual
-    (negrito, 14 pt, justificado).
+    (negrito, 14 pt, justificado). Quando a inspeção tem mais de um valor de
+    prolongador, a frase é ajustada para o plural.
     """
     from copy import deepcopy
 
@@ -141,6 +146,8 @@ def _linha_prolongador_geral(doc, texto_valor: str) -> None:
     marcador = "apresenta a seguinte resistência elétrica"
     for p in paragrafos:
         if marcador in p.text:
+            if plural:
+                _substituir_no_paragrafo(p, p.text, FRASE_PROLONGADOR_PLURAL)
             elemento = deepcopy(p._p)
             p._p.addnext(elemento)
             novo = Paragraph(elemento, p._parent)
@@ -191,10 +198,12 @@ def gerarLaudoGeral(
              "Aurora Fábrica Ração – Guatambu.xlsx"] = nome_planilha
     _aplicar_substituicoes(doc, subs)
     # Resistência do prolongador (valor vindo do pacote).
+    valores_prol = _prolongadores_da_inspecao(pacote, config.prolongador_padrao)
+    ohm = _ohm_do_documento(doc)
     _linha_prolongador_geral(
         doc,
-        _prolongador_da_inspecao(
-            pacote, config.prolongador_padrao, _ohm_do_documento(doc)),
+        " e ".join(f"{_fmt(v)}m{ohm}" for v in valores_prol),
+        plural=len(valores_prol) > 1,
     )
     _aplicar_imagens_config(doc, config)  # logo, equipamento, selo
 
