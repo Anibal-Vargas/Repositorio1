@@ -327,6 +327,20 @@ input[type=text]:focus{outline:2px solid var(--laranja); outline-offset:-1px; bo
       <div style="padding:0 22px 18px" id="painel-gerar"></div>
     </div>
 
+    <!-- Etapa 4 -->
+    <div class="etapa bloqueada" id="etapa-4">
+      <div class="etapa-topo">
+        <div class="numero">4</div>
+        <div class="etapa-info">
+          <h3>Salvar fotos do pacote</h3>
+          <p>Opcional. Reúne as fotos do .zip num arquivo só e pergunta onde salvar.</p>
+          <div class="estado" id="estado-4"></div>
+        </div>
+        <button class="btn btn-neutro" id="btn-4" disabled onclick="salvarFotos()">Salvar fotos</button>
+      </div>
+      <div style="padding:0 22px 18px" id="painel-fotos"></div>
+    </div>
+
   </div>
   <div class="rodape">
     <button class="btn btn-neutro" onclick="irPara('tela-menu')">Voltar</button>
@@ -512,7 +526,9 @@ async function lerUmZip(arq){
       `mas os anteriores dizem de ${estado.totalPartes}.`);
   }
   estado.totalPartes = parte.total;
-  estado.partes.set(parte.numero, { parte, dados, arquivo: arq.name, pasta });
+  // arquivoRef guarda o File (ponteiro para o disco, não os bytes) para que a
+  // etapa 4 possa reler as fotos sem manter o pacote inteiro na memória.
+  estado.partes.set(parte.numero, { parte, dados, arquivo: arq.name, pasta, arquivoRef: arq });
   estado.avisosPacote = problemas.avisos;
 }
 
@@ -638,6 +654,18 @@ function travarEtapa3(){
   document.getElementById('etapa-3').classList.add('bloqueada');
   document.getElementById('etapa-3').classList.remove('liberada');
   document.getElementById('btn-3').disabled = true;
+  travarEtapa4();
+}
+
+/* A etapa 4 só abre depois que a planilha foi gerada, e volta a fechar
+   sempre que o pacote é trocado — as fotos saem do pacote atual. */
+function travarEtapa4(){
+  document.getElementById('etapa-4').classList.add('bloqueada');
+  document.getElementById('etapa-4').classList.remove('liberada','concluida');
+  document.getElementById('btn-4').disabled = true;
+  document.getElementById('btn-4').textContent = 'Salvar fotos';
+  document.getElementById('estado-4').textContent = '';
+  document.getElementById('painel-fotos').innerHTML = '';
 }
 
 /* Falhar alto: erro crítico impede a geração; aviso só sinaliza. */
@@ -754,6 +782,7 @@ async function gerar(){
     if(salvo){
       document.getElementById('estado-3').textContent = `✓ ${nome}`;
       document.getElementById('etapa-3').classList.replace('liberada','concluida');
+      liberarEtapa4();
       alvo.innerHTML = bloco('ok',
         `<strong>Planilha gerada.</strong> ${r.totalPaineis} painéis transferidos.` +
         (r.avisos.length ? `<br>${r.avisos.length} ocorrência(s) registrada(s) na coluna ` +
@@ -766,6 +795,129 @@ async function gerar(){
   }finally{
     botao.textContent = 'Gerar planilha';
     if(!document.getElementById('etapa-3').classList.contains('concluida'))
+      botao.disabled = false;
+  }
+}
+
+/* ===================== etapa 4: fotos do pacote =====================
+   O pacote do app de campo traz as fotos em NCs/<data>/<área>/<painel>/<NC>/.
+   Aqui elas são copiadas para um .zip só de fotos, mantendo essa hierarquia —
+   é ela que diz a qual NC cada foto pertence; uma pasta plana perderia isso.
+   O nome do arquivo é fixo por decisão do cliente.                          */
+const EXTENSOES_FOTO = /\.(jpe?g|png|webp|gif|bmp|heic)$/i;
+const NOME_ZIP_FOTOS = 'Fotos inspeções painéis.zip';
+
+function liberarEtapa4(){
+  document.getElementById('etapa-4').classList.remove('bloqueada');
+  document.getElementById('etapa-4').classList.add('liberada');
+  document.getElementById('btn-4').disabled = false;
+}
+
+/* Fotos de um pacote, já sem o prefixo da pasta raiz. Em pacote dividido cada
+   parte tem a sua raiz; se dois caminhos colidirem, o da segunda parte mantém
+   a pasta original como prefixo em vez de sobrescrever silenciosamente. */
+async function coletarFotos(zip, pasta, usados){
+  const fotos = [];
+  const raiz = pasta ? pasta + '/' : '';
+  for(const caminho of Object.keys(zip.files)){
+    const entrada = zip.files[caminho];
+    if(entrada.dir || !EXTENSOES_FOTO.test(caminho)) continue;
+
+    let destino = caminho.startsWith(raiz) ? caminho.slice(raiz.length) : caminho;
+    if(usados.has(destino)) destino = caminho;
+    if(usados.has(destino)) continue;        // mesma foto, mesmo pacote: pula
+    usados.add(destino);
+    fotos.push({ destino, entrada });
+  }
+  return fotos;
+}
+
+async function salvarFotos(){
+  const alvo  = document.getElementById('painel-fotos');
+  const botao = document.getElementById('btn-4');
+  botao.disabled = true; botao.textContent = 'Preparando…';
+  alvo.innerHTML = bloco('alerta','Reunindo as fotos do pacote…');
+
+  try{
+    const saida = new JSZip();
+    const usados = new Set();
+    let total = 0;
+
+    // Uma parte por vez: o pacote inteiro nunca fica na memória duas vezes.
+    for(const p of estado.partes.values()){
+      const zip = await JSZip.loadAsync(await p.arquivoRef.arrayBuffer());
+      const fotos = await coletarFotos(zip, p.pasta, usados);
+      for(const f of fotos){
+        // JPEG já vem comprimido: recomprimir só gastaria tempo e memória.
+        saida.file(f.destino, await f.entrada.async('uint8array'), { compression:'STORE' });
+        total++;
+      }
+    }
+
+    if(!total){
+      alvo.innerHTML = bloco('alerta',
+        'Não encontrei nenhuma foto dentro do pacote. Nada foi salvo.');
+      botao.disabled = false; botao.textContent = 'Salvar fotos';
+      return;
+    }
+
+    alvo.innerHTML = bloco('alerta', `Compactando ${total} foto(s)…`);
+    botao.textContent = 'Salvando…';
+
+    let salvo = false;
+    if(window.showSaveFilePicker){
+      let alca;
+      try{
+        alca = await window.showSaveFilePicker({
+          suggestedName: NOME_ZIP_FOTOS,
+          types:[{ description:'Pacote de fotos', accept:{'application/zip':['.zip']} }],
+        });
+      }catch(e){
+        if(e.name === 'AbortError'){
+          alvo.innerHTML = bloco('alerta','Salvamento cancelado. As fotos não foram gravadas.');
+          botao.disabled = false; botao.textContent = 'Salvar fotos';
+          return;
+        }
+        throw e;
+      }
+      const fluxo = await alca.createWritable();
+      // Escreve em pedaços: um pacote com centenas de fotos não cabe
+      // confortavelmente num Blob único na memória.
+      await new Promise((ok, falha) => {
+        const fluxoZip = saida.generateInternalStream({ type:'uint8array', streamFiles:true });
+        fluxoZip.on('data', (pedaco, meta) => {
+          fluxoZip.pause();
+          fluxo.write(pedaco).then(() => {
+            alvo.innerHTML = bloco('alerta',
+              `Gravando… ${Math.round(meta.percent)}%`);
+            fluxoZip.resume();
+          }, falha);
+        }).on('error', falha).on('end', ok).resume();
+      });
+      await fluxo.close();
+      salvo = true;
+    }else{
+      // Navegador sem File System Access API: cai para download comum.
+      const blob = await saida.generateAsync({ type:'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = NOME_ZIP_FOTOS; a.click();
+      URL.revokeObjectURL(url);
+      salvo = true;
+    }
+
+    if(salvo){
+      document.getElementById('estado-4').textContent = `✓ ${NOME_ZIP_FOTOS}`;
+      document.getElementById('etapa-4').classList.replace('liberada','concluida');
+      alvo.innerHTML = bloco('ok',
+        `<strong>Fotos salvas.</strong> ${total} foto(s) em <strong>${NOME_ZIP_FOTOS}</strong>.`);
+    }
+  }catch(e){
+    alvo.innerHTML = bloco('erro','<strong>Falhou ao salvar as fotos:</strong> '+e.message);
+    console.error(e);
+  }finally{
+    botao.textContent = 'Salvar fotos';
+    if(!document.getElementById('etapa-4').classList.contains('concluida'))
       botao.disabled = false;
   }
 }

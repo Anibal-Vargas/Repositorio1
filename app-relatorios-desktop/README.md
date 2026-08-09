@@ -33,5 +33,6 @@ no gerador.
 
 - ✅ Planilha de painéis — pronta, validada com dados reais de produção
 - ✅ Pacotes divididos em partes — detecção e mesclagem
+- ✅ Salvar as fotos do pacote num `.zip` à parte (etapa 4, opcional)
 - ⏳ Relatório de não conformidades (Word + PDF) — não iniciado
 - ⏳ Alinhamento visual com o aplicativo de campo — aguardando o CSS

@@ -123,9 +123,17 @@ testes/                 Suíte de verificação + fixtures reais
 
 ### Fluxo do aplicativo
 
-Tela 1 (apresentação) → Tela 2 (escolher o que gerar) → Tela 3 (3 etapas
-sequenciais: dados do cliente → carregar .zip → gerar). Botão **Sair** sempre
-habilitado em todas as telas.
+Tela 1 (apresentação) → Tela 2 (escolher o que gerar) → Tela 3 (4 etapas
+sequenciais: dados do cliente → carregar .zip → gerar planilha → salvar fotos).
+Botão **Sair** sempre habilitado em todas as telas.
+
+A etapa 4 é **opcional** e só abre depois que a planilha foi gerada. Copia as
+fotos do pacote para um `.zip` à parte, mantendo a hierarquia
+`NCs/<data>/<área>/<painel>/<NC>/` — é ela que diz a qual NC cada foto pertence.
+O nome do arquivo é fixo: **`Fotos inspeções painéis.zip`** (decisão do cliente,
+constante `NOME_ZIP_FOTOS`). Só entram imagens: `dados.json`, `LEIA-ME.txt` e
+áudios ficam de fora. Em pacote dividido, junta as fotos de todas as partes
+carregadas.
 
 ### O gerador, em uma frase
 
