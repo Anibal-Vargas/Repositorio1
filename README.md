@@ -131,3 +131,9 @@ py converter_png_jpeg.py --somente-grandes
 O resultado vai para `C:\Temp\RNCs\Compactados_v2` por padrão (não
 sobrescreve a saída da 1ª passada) e o log fica em
 `log_conversao_png_jpeg.txt`.
+
+## Outros projetos neste repositório
+
+| Pasta | O que é |
+|---|---|
+| `app-relatorios-desktop/` | Gerador de relatórios e planilhas a partir de dados de inspeção (NR-10). Comece pelo `app-relatorios-desktop/CLAUDE.md`. |

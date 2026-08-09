@@ -1,0 +1,118 @@
+RELATORIOS DE INSPECAO - NORD CONSULT
+Aplicativo desktop - versao 1.0
+=============================================================================
+
+COMO USAR
+-----------------------------------------------------------------------------
+1. Copie esta pasta inteira para a maquina (ex.: C:\AppRelatorios).
+2. De um duplo clique em "Abrir aplicativo.bat".
+3. Siga as tres etapas na tela:
+      1) Dados do cliente             -> nome, cidade, estado e logo
+      2) Buscar dados do app de campo -> o arquivo .zip da inspecao
+      3) Gerar planilha               -> escolhe onde salvar
+
+Nao precisa instalar nada. Nao precisa de internet. Nao precisa de servidor.
+
+REQUISITOS
+-----------------------------------------------------------------------------
+- Windows com Google Chrome instalado.
+- O Chrome e obrigatorio: o aplicativo usa a File System Access API para o
+  dialogo "salvar onde?". Em outros navegadores ele cai para download comum
+  na pasta de Downloads.
+
+
+INSPECAO EXPORTADA EM VARIAS PARTES
+-----------------------------------------------------------------------------
+Inspecoes grandes saem do app de campo divididas (ex.: "parte 1 de 2").
+
+Ao carregar um arquivo assim, o aplicativo detecta sozinho e abre uma janela
+listando quais partes ja entraram e quais faltam, com um botao para adicionar
+os .zip complementares. Da para selecionar varios de uma vez, e a ordem nao
+importa.
+
+O aplicativo confere que todas as partes sao da MESMA inspecao (cliente e data)
+e avisa se um painel aparecer repetido em mais de uma parte.
+
+Se voce escolher "Gerar so com o que tenho", a planilha sai incompleta: os
+paineis das partes ausentes simplesmente nao aparecem, e NADA na planilha
+indica que faltou alguem. Confira o numero de paineis antes de enviar.
+
+OBS.: hoje a deteccao le o nome da pasta/arquivo e o LEIA-ME do pacote, porque
+o dados.json ainda nao traz um campo estruturado de parte. Quando o app de
+campo passar a gravar `parte: {numero, de}`, a deteccao fica mais confiavel.
+
+
+NOME DO ARQUIVO GERADO
+-----------------------------------------------------------------------------
+    Relatório de Inspeção Painéis - Cliente - Cidade - Estado.xlsx
+
+preenchido com os dados da etapa 1.
+
+
+O QUE TEM NESTA PASTA
+-----------------------------------------------------------------------------
+  index.html                 O aplicativo (telas + logica de interface)
+  src/planilha.js            Motor que preenche a planilha modelo
+  modelo/modelo-base64.js    A planilha modelo, embutida no aplicativo
+  vendor/jszip.min.js        Biblioteca para ler/escrever .xlsx e .zip
+  Abrir aplicativo.bat       Atalho que abre em modo aplicativo
+  ferramentas/embutir_modelo.py   Para trocar a planilha modelo
+
+
+TROCAR A PLANILHA MODELO
+-----------------------------------------------------------------------------
+A planilha modelo fica EMBUTIDA no aplicativo (arquivo modelo-base64.js).
+Isso e proposital: garante que todo mundo gere a partir do mesmo modelo e
+que o aplicativo funcione sem depender de caminho de rede.
+
+Quando o modelo mudar, rode:
+
+    python ferramentas\embutir_modelo.py "novo_modelo.xlsx"
+
+Isso regrava modelo/modelo-base64.js. Mais nada precisa ser alterado.
+
+ATENCAO: se o modelo mudar de POSICAO DE COLUNAS, e preciso ajustar tambem o
+bloco COLUNAS no arquivo src/planilha.js. Entre as versoes anteriores do
+modelo, o ranking ja andou de Q para S e depois para T, e a legenda de T para
+V e depois para W. As posicoes atuais estao todas no topo do planilha.js,
+comentadas.
+
+
+O QUE O APLICATIVO NAO ALTERA NA PLANILHA
+-----------------------------------------------------------------------------
+Nada alem das celulas de dados. O arquivo gerado mantem, byte a byte:
+  - todas as formulas (inclusive a aba Ranking inteira)
+  - todos os estilos, cores, bordas e larguras
+  - a formatacao condicional (inclusive a do tipo "x14", que a maioria das
+    bibliotecas de planilha destroi sem avisar)
+  - a validacao de dados das celulas de resposta
+  - as imagens (logo NORD e legenda)
+
+A unica imagem trocada e a logo do cliente, quando voce enviar uma.
+
+
+TRES ARMADILHAS QUE ESTE APLICATIVO EVITA
+-----------------------------------------------------------------------------
+1. As respostas nao sao "Sim"/"Nao": sao simbolos da fonte Wingdings 2. Se
+   fossem gravados como texto, as formulas nunca casariam e TODO painel
+   marcaria 100% - sem nenhum erro aparecer.
+
+2. Item que o inspetor nao respondeu em campo. Deixado em branco, ele entra
+   inteiro no ranking pontuando cheio: item nunca olhado vira item aprovado.
+   O aplicativo lanca como "nao se aplica" e avisa na coluna "Outras nao
+   conformidades" quais itens foram pulados.
+
+3. A planilha guarda valores calculados em cache. Sem forcar o recalculo, o
+   Excel mostraria 100% em todos os painels ate alguem apertar Ctrl+Alt+F9.
+   O aplicativo marca o arquivo para recalcular sozinho ao abrir.
+
+
+CONFERENCIA RAPIDA DO ARQUIVO GERADO
+-----------------------------------------------------------------------------
+Abra a planilha e confirme, em 10 segundos:
+  [ ] existe pelo menos uma celula VERDE e uma VERMELHA na grade
+  [ ] existe pelo menos um painel com ranking ABAIXO de 100%
+  [ ] o cabecalho traz cliente, cidade e estado corretos
+
+Se estiver tudo branco, ou tudo verde, ou tudo 100%: alguma coisa quebrou.
+Nao envie o arquivo. Avise o responsavel tecnico.

@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios de Inspeção — NORD CONSULT</title>
+<style>
+/* ===== Tokens de tema =========================================================
+   Paleta derivada da logo NORD CONSULT (#E87A0D). Para alinhar com o app de
+   campo, basta trocar os valores deste bloco — nenhum outro lugar tem cor fixa.
+   ========================================================================== */
+:root{
+  --laranja:#E87A0D;      --laranja-escuro:#C4650A;   --laranja-claro:#FDF1E3;
+  --grafite:#1F2933;      --grafite-medio:#3E4C59;    --cinza:#7B8794;
+  --cinza-claro:#E4E7EB;  --fundo:#F5F7FA;            --branco:#FFFFFF;
+  --verde:#00A65A;        --vermelho:#D64545;         --amarelo:#F0B429;
+  --raio:10px;            --sombra:0 1px 3px rgba(31,41,51,.12), 0 4px 16px rgba(31,41,51,.08);
+  --fonte:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--fonte); background:var(--fundo); color:var(--grafite);
+  display:flex; flex-direction:column; min-height:100vh; font-size:15px;
+}
+
+/* ===== Estrutura ===== */
+.tela{display:none; flex:1; flex-direction:column}
+.tela.ativa{display:flex}
+
+.cabecalho{
+  background:var(--branco); border-bottom:1px solid var(--cinza-claro);
+  padding:14px 28px; display:flex; align-items:center; gap:16px;
+}
+.cabecalho .marca{font-weight:700; font-size:17px; letter-spacing:-.01em}
+.cabecalho .marca span{color:var(--laranja)}
+.cabecalho .trilha{color:var(--cinza); font-size:13px; margin-left:auto}
+
+.conteudo{flex:1; padding:32px 28px; max-width:820px; width:100%; margin:0 auto}
+.rodape{
+  padding:16px 28px; border-top:1px solid var(--cinza-claro);
+  background:var(--branco); display:flex; gap:12px; justify-content:flex-end;
+}
+
+/* ===== Botões ===== */
+button{font-family:inherit; font-size:15px; cursor:pointer; border:none; border-radius:var(--raio)}
+.btn{padding:12px 22px; font-weight:600; transition:background .15s, opacity .15s}
+.btn-primario{background:var(--laranja); color:#fff}
+.btn-primario:hover:not(:disabled){background:var(--laranja-escuro)}
+.btn-neutro{background:var(--branco); color:var(--grafite-medio); border:1px solid var(--cinza-claro)}
+.btn-neutro:hover:not(:disabled){background:var(--fundo)}
+.btn-sair{background:var(--branco); color:var(--vermelho); border:1px solid var(--cinza-claro)}
+.btn-sair:hover{background:#FDECEC}
+button:disabled{opacity:.45; cursor:not-allowed}
+
+/* ===== Tela 1: apresentação ===== */
+#tela-apresentacao .conteudo{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:8px; max-width:640px;
+}
+.logo-nord{width:150px; margin-bottom:24px}
+.titulo-app{font-size:30px; font-weight:700; letter-spacing:-.02em}
+.subtitulo-app{color:var(--cinza-claro)}
+.subtitulo-app{color:var(--cinza); font-size:16px; max-width:440px; line-height:1.55; margin-bottom:28px}
+.versao{margin-top:32px; font-size:12px; color:var(--cinza)}
+
+/* ===== Cartões de opção (tela 2) ===== */
+.opcoes{display:grid; gap:16px; margin-top:8px}
+.opcao{
+  background:var(--branco); border:1px solid var(--cinza-claro); border-radius:var(--raio);
+  padding:22px 24px; text-align:left; display:flex; align-items:center; gap:18px;
+  box-shadow:var(--sombra); transition:border-color .15s, transform .1s; width:100%;
+}
+.opcao:hover:not(:disabled){border-color:var(--laranja); transform:translateY(-1px)}
+.opcao:disabled{background:var(--fundo); box-shadow:none}
+.opcao .icone{
+  width:46px; height:46px; flex:none; border-radius:var(--raio);
+  background:var(--laranja-claro); color:var(--laranja);
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+}
+.opcao:disabled .icone{background:var(--cinza-claro); color:var(--cinza)}
+.opcao h3{font-size:17px; font-weight:600; margin-bottom:3px}
+.opcao p{font-size:13.5px; color:var(--cinza); line-height:1.45}
+.etiqueta{
+  margin-left:auto; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--cinza); background:var(--cinza-claro);
+  padding:4px 9px; border-radius:5px; flex:none;
+}
+
+/* ===== Etapas (tela 3) ===== */
+.etapa{
+  background:var(--branco); border:1px solid var(--cinza-claro); border-radius:var(--raio);
+  margin-bottom:14px; box-shadow:var(--sombra); overflow:hidden;
+}
+.etapa.bloqueada{opacity:.55}
+.etapa-topo{display:flex; align-items:center; gap:16px; padding:18px 22px}
+.numero{
+  width:32px; height:32px; flex:none; border-radius:50%; font-weight:700; font-size:15px;
+  background:var(--cinza-claro); color:var(--cinza);
+  display:flex; align-items:center; justify-content:center;
+}
+.etapa.liberada .numero{background:var(--laranja); color:#fff}
+.etapa.concluida .numero{background:var(--verde); color:#fff}
+.etapa-info{flex:1; min-width:0}
+.etapa-info h3{font-size:16px; font-weight:600}
+.etapa-info p{font-size:13px; color:var(--cinza); margin-top:2px}
+.etapa-info .estado{font-size:13px; color:var(--verde); font-weight:600; margin-top:4px}
+.etapa-topo .btn{flex:none}
+
+.painel-form{padding:0 22px 22px; border-top:1px solid var(--cinza-claro); margin-top:2px}
+.painel-form.oculto{display:none}
+.campos{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0}
+.campo{display:flex; flex-direction:column; gap:5px}
+.campo.largo{grid-column:1 / -1}
+label{font-size:13px; font-weight:600; color:var(--grafite-medio)}
+input[type=text]{
+  padding:10px 12px; border:1px solid var(--cinza-claro); border-radius:8px;
+  font-family:inherit; font-size:15px; background:var(--branco);
+}
+input[type=text]:focus{outline:2px solid var(--laranja); outline-offset:-1px; border-color:transparent}
+.area-logo{display:flex; align-items:center; gap:16px}
+.previa-logo{
+  width:130px; height:72px; border:1px dashed var(--cinza-claro); border-radius:8px;
+  display:flex; align-items:center; justify-content:center; background:var(--fundo);
+  font-size:12px; color:var(--cinza); overflow:hidden; flex:none; text-align:center;
+}
+.previa-logo img{max-width:100%; max-height:100%; object-fit:contain}
+
+.aviso{
+  border-radius:8px; padding:13px 16px; font-size:13.5px; line-height:1.5; margin-top:14px;
+}
+.aviso-erro{background:#FDECEC; color:#8B2C2C; border:1px solid #F5C6C6}
+.aviso-alerta{background:#FFF8E6; color:#7A5B00; border:1px solid #F5E3B0}
+.aviso-ok{background:#E8F7F0; color:#0A6B44; border:1px solid #B8E5D0}
+.aviso ul{margin:8px 0 0 18px}
+.aviso li{margin-bottom:3px}
+
+.resumo{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px}
+.resumo div{background:var(--fundo); border-radius:8px; padding:12px; text-align:center}
+.resumo strong{display:block; font-size:21px; color:var(--laranja)}
+.resumo span{font-size:12px; color:var(--cinza)}
+
+/* ===== Janela modal (pacotes divididos) ===== */
+.fundo-modal{
+  display:none; position:fixed; inset:0; background:rgba(31,41,51,.55);
+  align-items:center; justify-content:center; padding:24px; z-index:50;
+}
+.fundo-modal.ativo{display:flex}
+.modal{
+  background:var(--branco); border-radius:var(--raio); max-width:560px; width:100%;
+  box-shadow:0 12px 48px rgba(31,41,51,.28); overflow:hidden;
+}
+.modal-topo{padding:22px 26px 0}
+.modal-topo h2{font-size:19px; font-weight:700}
+.modal-topo p{color:var(--cinza); font-size:14px; margin-top:6px; line-height:1.5}
+.modal-corpo{padding:18px 26px}
+.modal-rodape{
+  padding:16px 26px; background:var(--fundo); border-top:1px solid var(--cinza-claro);
+  display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;
+}
+.lista-partes{display:flex; flex-direction:column; gap:8px}
+.parte{
+  display:flex; align-items:center; gap:12px; padding:11px 14px;
+  border:1px solid var(--cinza-claro); border-radius:8px; font-size:14px;
+}
+.parte.ok{background:#E8F7F0; border-color:#B8E5D0}
+.parte.falta{background:var(--fundo); border-style:dashed; color:var(--cinza)}
+.parte .selo{
+  width:26px; height:26px; flex:none; border-radius:50%; font-size:13px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cinza-claro); color:var(--cinza);
+}
+.parte.ok .selo{background:var(--verde); color:#fff}
+.parte .arquivo{font-size:12px; color:var(--cinza); margin-left:auto; text-align:right}
+
+@media (max-width:640px){
+  .campos,.resumo{grid-template-columns:1fr}
+  .etapa-topo{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ TELA 1 ============================ -->
+<section class="tela ativa" id="tela-apresentacao">
+  <div class="conteudo">
+    <img class="logo-nord" id="logo-nord" alt="NORD CONSULT">
+    <h1 class="titulo-app">Relatórios de Inspeção</h1>
+    <p class="subtitulo-app">
+      Transforma os pacotes exportados pelo aplicativo de campo em planilhas e
+      relatórios de não conformidades.
+    </p>
+    <button class="btn btn-primario" onclick="irPara('tela-menu')">Iniciar</button>
+    <p class="versao">Versão 1.0 &middot; NORD CONSULT &middot; NR-10</p>
+  </div>
+  <div class="rodape">
+    <button class="btn btn-sair" onclick="sair()">Sair</button>
+  </div>
+</section>
+
+<!-- ============================ TELA 2 ============================ -->
+<section class="tela" id="tela-menu">
+  <header class="cabecalho">
+    <div class="marca">NORD<span> CONSULT</span></div>
+    <div class="trilha">O que você quer gerar?</div>
+  </header>
+  <div class="conteudo">
+    <div class="opcoes">
+      <button class="opcao" onclick="abrirGeracao()">
+        <div class="icone">▦</div>
+        <div>
+          <h3>Gerar planilha de painéis</h3>
+          <p>Planilha resumo com ranking NR-10 a partir de uma inspeção de painéis elétricos.</p>
+        </div>
+      </button>
+      <button class="opcao" disabled>
+        <div class="icone">▤</div>
+        <div>
+          <h3>Relatório de não conformidades</h3>
+          <p>Documento com fotos, descrições e plano de ação por NC.</p>
+        </div>
+        <span class="etiqueta">Em breve</span>
+      </button>
+    </div>
+  </div>
+  <div class="rodape">
+    <button class="btn btn-neutro" onclick="irPara('tela-apresentacao')">Voltar</button>
+    <button class="btn btn-sair" onclick="sair()">Sair</button>
+  </div>
+</section>
+
+<!-- ============================ TELA 3 ============================ -->
+<section class="tela" id="tela-geracao">
+  <header class="cabecalho">
+    <div class="marca">NORD<span> CONSULT</span></div>
+    <div class="trilha">Planilha de painéis elétricos</div>
+  </header>
+  <div class="conteudo">
+
+    <!-- Etapa 1 -->
+    <div class="etapa liberada" id="etapa-1">
+      <div class="etapa-topo">
+        <div class="numero">1</div>
+        <div class="etapa-info">
+          <h3>Dados do cliente</h3>
+          <p>Identificação que vai no cabeçalho da planilha.</p>
+          <div class="estado" id="estado-1"></div>
+        </div>
+        <button class="btn btn-primario" id="btn-1" onclick="alternarForm()">Preencher</button>
+      </div>
+      <div class="painel-form oculto" id="form-cliente">
+        <div class="campos">
+          <div class="campo largo">
+            <label for="in-cliente">Cliente</label>
+            <input type="text" id="in-cliente" placeholder="Ex.: Aurora Alimentos">
+          </div>
+          <div class="campo">
+            <label for="in-cidade">Cidade</label>
+            <input type="text" id="in-cidade" placeholder="Ex.: Chapecó">
+          </div>
+          <div class="campo">
+            <label for="in-estado">Estado</label>
+            <input type="text" id="in-estado" placeholder="Ex.: SC">
+          </div>
+          <div class="campo largo">
+            <label>Logo do cliente <span style="font-weight:400;color:var(--cinza)">(opcional)</span></label>
+            <div class="area-logo">
+              <div class="previa-logo" id="previa-logo">sem logo</div>
+              <div>
+                <input type="file" id="in-logo" accept="image/*" style="display:none"
+                       onchange="carregarLogo(this)">
+                <button class="btn btn-neutro" onclick="document.getElementById('in-logo').click()">
+                  Escolher imagem…
+                </button>
+                <p style="font-size:12.5px;color:var(--cinza);margin-top:6px;max-width:330px">
+                  Substitui a logo do cliente no cabeçalho. A imagem é ajustada
+                  ao espaço reservado sem distorcer.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primario" onclick="salvarCliente()">Confirmar dados</button>
+        <div id="erro-cliente"></div>
+      </div>
+    </div>
+
+    <!-- Etapa 2 -->
+    <div class="etapa bloqueada" id="etapa-2">
+      <div class="etapa-topo">
+        <div class="numero">2</div>
+        <div class="etapa-info">
+          <h3>Buscar dados do aplicativo de campo</h3>
+          <p>Pacote .zip exportado pelo aplicativo de campo.</p>
+          <div class="estado" id="estado-2"></div>
+        </div>
+        <input type="file" id="in-zip" accept=".zip" multiple style="display:none" onchange="lerZip(this)">
+        <button class="btn btn-primario" id="btn-2" disabled
+                onclick="acaoBotao2()">Selecionar .zip</button>
+      </div>
+      <div style="padding:0 22px 18px" id="painel-zip"></div>
+    </div>
+
+    <!-- Etapa 3 -->
+    <div class="etapa bloqueada" id="etapa-3">
+      <div class="etapa-topo">
+        <div class="numero">3</div>
+        <div class="etapa-info">
+          <h3>Gerar planilha</h3>
+          <p>Preenche a planilha modelo e pergunta onde salvar.</p>
+          <div class="estado" id="estado-3"></div>
+        </div>
+        <button class="btn btn-primario" id="btn-3" disabled onclick="gerar()">Gerar planilha</button>
+      </div>
+      <div style="padding:0 22px 18px" id="painel-gerar"></div>
+    </div>
+
+  </div>
+  <div class="rodape">
+    <button class="btn btn-neutro" onclick="irPara('tela-menu')">Voltar</button>
+    <button class="btn btn-sair" onclick="sair()">Sair</button>
+  </div>
+</section>
+
+<!-- ==================== JANELA: PACOTE DIVIDIDO ==================== -->
+<div class="fundo-modal" id="modal-partes">
+  <div class="modal">
+    <div class="modal-topo">
+      <h2>Esta inspeção foi exportada em várias partes</h2>
+      <p id="modal-texto"></p>
+    </div>
+    <div class="modal-corpo">
+      <div class="lista-partes" id="lista-partes"></div>
+      <div id="modal-avisos"></div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn btn-neutro" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-neutro" id="btn-assim-mesmo" onclick="continuarIncompleto()">
+        Gerar só com o que tenho
+      </button>
+      <button class="btn btn-primario"
+              onclick="document.getElementById('in-zip').click()">
+        Adicionar arquivos .zip
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="modelo/modelo-base64.js"></script>
+<script src="src/planilha.js"></script>
+<script>
+/* ===================== estado da aplicação ===================== */
+const estado = { cliente:null, logoBytes:null, logoUrl:null, dados:null, nomePacote:null };
+
+function irPara(id){
+  document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
+  document.getElementById(id).classList.add('ativa');
+  window.scrollTo(0,0);
+}
+function abrirGeracao(){ irPara('tela-geracao'); }
+
+function sair(){
+  if(!confirm('Encerrar o aplicativo? Dados não salvos serão perdidos.')) return;
+  window.close();
+  document.body.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;height:100vh;'+
+    'flex-direction:column;gap:10px;color:#7B8794;font-family:var(--fonte)">'+
+    '<p style="font-size:17px">Aplicativo encerrado.</p>'+
+    '<p style="font-size:13px">Você já pode fechar esta janela.</p></div>';
+}
+
+function bloco(tipo, html){ return `<div class="aviso aviso-${tipo}">${html}</div>`; }
+
+/* ===================== etapa 1: dados do cliente ===================== */
+function alternarForm(){
+  document.getElementById('form-cliente').classList.toggle('oculto');
+}
+
+function carregarLogo(input){
+  const arq = input.files[0];
+  if(!arq) return;
+  const leitor = new FileReader();
+  leitor.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Encaixa no espaço reservado do modelo (250x138) sem distorcer:
+      // a imagem é centralizada sobre fundo branco.
+      const C = document.createElement('canvas');
+      C.width = 250; C.height = 138;
+      const ctx = C.getContext('2d');
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,250,138);
+      const escala = Math.min(250/img.width, 138/img.height);
+      const l = img.width*escala, a = img.height*escala;
+      ctx.drawImage(img, (250-l)/2, (138-a)/2, l, a);
+      C.toBlob(async b => {
+        estado.logoBytes = await b.arrayBuffer();
+        estado.logoUrl = C.toDataURL('image/jpeg', .92);
+        document.getElementById('previa-logo').innerHTML =
+          `<img src="${estado.logoUrl}" alt="logo do cliente">`;
+      }, 'image/jpeg', .92);
+    };
+    img.onerror = () => {
+      document.getElementById('erro-cliente').innerHTML =
+        bloco('erro','Não consegui ler essa imagem. Tente PNG ou JPG.');
+    };
+    img.src = e.target.result;
+  };
+  leitor.readAsDataURL(arq);
+}
+
+function salvarCliente(){
+  const nome   = document.getElementById('in-cliente').value.trim();
+  const cidade = document.getElementById('in-cidade').value.trim();
+  const estadoUF = document.getElementById('in-estado').value.trim();
+  const alvoErro = document.getElementById('erro-cliente');
+
+  const faltando = [];
+  if(!nome) faltando.push('Cliente');
+  if(!cidade) faltando.push('Cidade');
+  if(!estadoUF) faltando.push('Estado');
+  if(faltando.length){
+    alvoErro.innerHTML = bloco('erro','Falta preencher: <strong>'+faltando.join(', ')+'</strong>.');
+    return;
+  }
+  alvoErro.innerHTML = '';
+  estado.cliente = { nome, cidade, estado:estadoUF };
+
+  document.getElementById('estado-1').textContent =
+    `✓ ${nome} — ${cidade}/${estadoUF}${estado.logoBytes ? ' · logo carregada' : ''}`;
+  document.getElementById('etapa-1').classList.replace('liberada','concluida');
+  document.getElementById('btn-1').textContent = 'Alterar';
+  document.getElementById('btn-1').className = 'btn btn-neutro';
+  document.getElementById('form-cliente').classList.add('oculto');
+
+  document.getElementById('etapa-2').classList.replace('bloqueada','liberada');
+  document.getElementById('btn-2').disabled = false;
+}
+
+/* ===================== etapa 2: pacote do app de campo ===================== */
+estado.partes = new Map();     // numero da parte -> { parte, dados, arquivo }
+estado.totalPartes = 1;
+estado.conflitos = [];
+
+async function lerZip(input){
+  const arquivos = [...input.files];
+  input.value = '';                       // permite reescolher o mesmo arquivo
+  if(!arquivos.length) return;
+
+  const alvo = document.getElementById('painel-zip');
+  alvo.innerHTML = bloco('alerta',
+    `Lendo ${arquivos.length} arquivo(s)…`);
+
+  const erros = [];
+  for(const arq of arquivos){
+    try{
+      await lerUmZip(arq);
+    }catch(e){
+      erros.push(`<strong>${arq.name}</strong>: ${e.message}`);
+    }
+  }
+
+  if(erros.length){
+    alvo.innerHTML = bloco('erro',
+      '<strong>Não consegui usar:</strong><ul>' +
+      erros.map(e=>`<li>${e}</li>`).join('') + '</ul>');
+  }
+
+  if(!estado.partes.size){ travarEtapa3(); return; }
+
+  const faltando = partesFaltando();
+  if(faltando.length){ mostrarModal(faltando); return; }
+
+  fecharModal();
+  consolidar();
+}
+
+async function lerUmZip(arq){
+  const zip = await JSZip.loadAsync(await arq.arrayBuffer());
+
+  const entrada = Object.keys(zip.files)
+    .find(n => n.endsWith('dados.json') && !zip.files[n].dir);
+  if(!entrada) throw new Error(
+    'não encontrei o arquivo dados.json dentro do .zip. ' +
+    'Confirme que este é um pacote exportado pelo aplicativo de campo.');
+
+  const dados = JSON.parse(await zip.file(entrada).async('string'));
+  const problemas = validar(dados);
+  if(problemas.criticos.length) throw new Error(problemas.criticos.join(' '));
+
+  const pasta = entrada.split('/')[0] || '';
+  const nomeLeiame = Object.keys(zip.files).find(n => /LEIA-?ME/i.test(n));
+  const leiame = nomeLeiame ? await zip.file(nomeLeiame).async('string') : '';
+  const parte = detectarParte(arq.name, pasta, leiame);
+
+  if(estado.partes.size){
+    // Total de partes tem que bater entre os arquivos
+    if(parte.total !== estado.totalPartes) throw new Error(
+      `este arquivo diz ser parte ${parte.numero} de ${parte.total}, ` +
+      `mas os anteriores dizem de ${estado.totalPartes}.`);
+  }
+  estado.totalPartes = parte.total;
+  estado.partes.set(parte.numero, { parte, dados, arquivo: arq.name, pasta });
+  estado.avisosPacote = problemas.avisos;
+}
+
+function partesFaltando(){
+  const faltando = [];
+  for(let n=1; n<=estado.totalPartes; n++)
+    if(!estado.partes.has(n)) faltando.push(n);
+  return faltando;
+}
+
+/* ---------- janela de partes ---------- */
+function mostrarModal(faltando){
+  const carregadas = estado.partes.size;
+  document.getElementById('modal-texto').innerHTML =
+    `Os arquivos indicam <strong>${estado.totalPartes} partes</strong>. ` +
+    `Você carregou ${carregadas}. ` +
+    `Adicione os arquivos que faltam para que a planilha saia completa.`;
+
+  const lista = [];
+  for(let n=1; n<=estado.totalPartes; n++){
+    const p = estado.partes.get(n);
+    lista.push(p
+      ? `<div class="parte ok"><div class="selo">✓</div>
+           <div>Parte ${n} de ${estado.totalPartes}</div>
+           <div class="arquivo">${p.arquivo}</div></div>`
+      : `<div class="parte falta"><div class="selo">${n}</div>
+           <div>Parte ${n} de ${estado.totalPartes}</div>
+           <div class="arquivo">aguardando arquivo</div></div>`);
+  }
+  document.getElementById('lista-partes').innerHTML = lista.join('');
+
+  document.getElementById('modal-avisos').innerHTML = bloco('alerta',
+    'Gerando só com as partes atuais, os painéis das partes ausentes ' +
+    '<strong>não aparecem</strong> na planilha — e nada na planilha indica que ' +
+    'faltou alguém. Confira o número de painéis antes de enviar ao cliente.');
+
+  document.getElementById('modal-partes').classList.add('ativo');
+}
+
+function fecharModal(){
+  document.getElementById('modal-partes').classList.remove('ativo');
+}
+
+function continuarIncompleto(){
+  fecharModal();
+  consolidar({ incompleto: true });
+}
+
+/* ---------- consolidação das partes ---------- */
+function consolidar(opcoes){
+  const alvo = document.getElementById('painel-zip');
+  const partes = [...estado.partes.values()];
+  const faltando = partesFaltando();
+
+  let dados, conflitos = [];
+  if(partes.length === 1){
+    dados = partes[0].dados;
+  }else{
+    const r = mesclarPartes(partes);
+    dados = r.dados; conflitos = r.conflitos;
+  }
+  estado.dados = dados;
+  estado.nomePacote = partes[0].pasta || partes[0].arquivo.replace(/\.zip$/i,'');
+
+  const { paineis } = interpretarDados(dados);
+  const { avisos } = montarLinhas(interpretarDados(dados));
+  const t = dados.totais || {};
+
+  let html = `<div class="resumo">
+      <div><strong>${paineis.length}</strong><span>painéis</span></div>
+      <div><strong>${t.ncs ?? '—'}</strong><span>não conformidades</span></div>
+      <div><strong>${t.fotos ?? '—'}</strong><span>fotos</span></div>
+      <div><strong>${estado.partes.size}/${estado.totalPartes}</strong><span>partes</span></div>
+    </div>`;
+
+  if(faltando.length){
+    html += bloco('erro',
+      `<strong>Planilha incompleta:</strong> falta(m) a(s) parte(s) ` +
+      `${faltando.join(', ')} de ${estado.totalPartes}. ` +
+      `Os painéis dessas partes não vão aparecer.`);
+  }
+
+  const alertas = (estado.avisosPacote || []).concat(conflitos, avisos.slice(0,8));
+  if(alertas.length){
+    html += bloco('alerta',
+      '<strong>Atenção — a planilha será gerada, mas confira:</strong><ul>' +
+      alertas.map(a=>`<li>${a}</li>`).join('') +
+      (avisos.length>8 ? `<li>…e mais ${avisos.length-8} ocorrência(s).</li>` : '') +
+      '</ul>');
+  }else if(!faltando.length){
+    html += bloco('ok','Pacote íntegro. Nenhuma inconsistência encontrada.');
+  }
+  alvo.innerHTML = html;
+
+  const rotuloPartes = estado.totalPartes > 1
+    ? ` (${estado.partes.size} de ${estado.totalPartes} partes)` : '';
+  document.getElementById('estado-2').textContent =
+    `✓ ${estado.nomePacote}${rotuloPartes} — ${paineis.length} painéis`;
+  document.getElementById('etapa-2').classList.remove('liberada');
+  document.getElementById('etapa-2').classList.add('concluida');
+  document.getElementById('btn-2').textContent = 'Trocar pacote';
+  document.getElementById('btn-2').className = 'btn btn-neutro';
+
+  document.getElementById('etapa-3').classList.remove('bloqueada');
+  document.getElementById('etapa-3').classList.add('liberada');
+  document.getElementById('btn-3').disabled = false;
+}
+
+function reiniciarPacote(){
+  estado.partes.clear();
+  estado.totalPartes = 1;
+  estado.dados = null;
+  document.getElementById('painel-zip').innerHTML = '';
+  document.getElementById('estado-2').textContent = '';
+  document.getElementById('etapa-2').classList.remove('concluida');
+  document.getElementById('etapa-2').classList.add('liberada');
+  travarEtapa3();
+  document.getElementById('in-zip').click();
+}
+
+function travarEtapa3(){
+  estado.dados = null;
+  document.getElementById('etapa-3').classList.add('bloqueada');
+  document.getElementById('etapa-3').classList.remove('liberada');
+  document.getElementById('btn-3').disabled = true;
+}
+
+/* Falhar alto: erro crítico impede a geração; aviso só sinaliza. */
+function validar(d){
+  const criticos = [], avisos = [];
+
+  if(!d.checklist || !Array.isArray(d.checklist))
+    criticos.push('O dados.json não tem a seção <code>checklist</code>.');
+
+  const tipo = (d.inspecao && (d.inspecao.tipo || d.inspecao.rotuloTipo)) || '';
+  if(tipo && !/pain/i.test(tipo))
+    criticos.push(`Este pacote é do tipo <strong>${tipo}</strong>. ` +
+                  'Esta planilha só atende Inspeção de Painéis Elétricos.');
+
+  if(d.versaoSchema){
+    const maior = String(d.versaoSchema).split('.')[0];
+    if(maior !== '1')
+      criticos.push(`O pacote usa o esquema de dados versão ${d.versaoSchema}, ` +
+                    'incompatível com esta versão do aplicativo.');
+  }else{
+    avisos.push('O pacote não informa <code>versaoSchema</code>. ' +
+                'Assumindo o formato atual — confira o resultado com atenção.');
+  }
+
+  if(d.checklist){
+    const secoes = d.checklist.filter(s => /Verificações do painel\s*$/.test(s.secao));
+    if(!secoes.length)
+      criticos.push('Nenhuma seção "Verificações do painel" no checklist. ' +
+                    'O pacote parece ser de outro tipo de inspeção.');
+  }
+
+  const ncs = (d.areas||[]).flatMap(a => a.ncs||[]);
+  if(ncs.length){
+    const nums = ncs.map(n => parseInt(String(n.numero).split('-')[1],10))
+                    .filter(n => !isNaN(n)).sort((a,b)=>a-b);
+    if(nums.length){
+      const buracos = nums[nums.length-1] - nums[0] + 1 - nums.length;
+      if(buracos > 0)
+        avisos.push(`A numeração de NCs tem ${buracos} lacuna(s) ` +
+                    `(vai de ${nums[0]} a ${nums[nums.length-1]}, com ${nums.length} registradas). ` +
+                    'Normal se alguma NC foi apagada em campo.');
+    }
+  }
+  return { criticos, avisos };
+}
+
+/* ===================== etapa 3: gerar ===================== */
+function bytesDoModelo(){
+  const bin = atob(window.MODELO_XLSX_B64);
+  const buf = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
+  return buf;
+}
+
+function nomeSugerido(){
+  // Padrao da empresa: "Relatório de Inspeção Painéis - Cliente - Cidade - Estado"
+  // Só removemos os caracteres que o Windows nao aceita em nome de arquivo.
+  const limpo = s => String(s||'').replace(/[\\/:*?"<>|]/g,'-').trim();
+  const c = estado.cliente;
+  return `Relatório de Inspeção Painéis - ${limpo(c.nome)} - ` +
+         `${limpo(c.cidade)} - ${limpo(c.estado)}.xlsx`;
+}
+
+function acaoBotao2(){
+  if(estado.partes.size) reiniciarPacote();
+  else document.getElementById('in-zip').click();
+}
+
+async function gerar(){
+  const alvo = document.getElementById('painel-gerar');
+  const botao = document.getElementById('btn-3');
+  botao.disabled = true; botao.textContent = 'Gerando…';
+  alvo.innerHTML = bloco('alerta','Preenchendo a planilha modelo…');
+
+  try{
+    const r = await gerarPlanilha({
+      modeloBytes: bytesDoModelo(),
+      dados: estado.dados,
+      cliente: estado.cliente,
+      logoBytes: estado.logoBytes,
+    });
+
+    const nome = nomeSugerido();
+    let salvo = false;
+
+    if(window.showSaveFilePicker){
+      try{
+        const alca = await window.showSaveFilePicker({
+          suggestedName: nome,
+          types:[{ description:'Planilha do Excel',
+                   accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']} }],
+        });
+        const fluxo = await alca.createWritable();
+        await fluxo.write(r.blob);
+        await fluxo.close();
+        salvo = true;
+      }catch(e){
+        if(e.name === 'AbortError'){        // usuário cancelou o diálogo
+          alvo.innerHTML = bloco('alerta','Salvamento cancelado. A planilha não foi gravada.');
+          botao.disabled = false; botao.textContent = 'Gerar planilha';
+          return;
+        }
+        throw e;
+      }
+    }else{
+      // Navegador sem File System Access API: cai para download comum.
+      const url = URL.createObjectURL(r.blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = nome; a.click();
+      URL.revokeObjectURL(url);
+      salvo = true;
+    }
+
+    if(salvo){
+      document.getElementById('estado-3').textContent = `✓ ${nome}`;
+      document.getElementById('etapa-3').classList.replace('liberada','concluida');
+      alvo.innerHTML = bloco('ok',
+        `<strong>Planilha gerada.</strong> ${r.totalPaineis} painéis transferidos.` +
+        (r.avisos.length ? `<br>${r.avisos.length} ocorrência(s) registrada(s) na coluna ` +
+                           '"Outras não conformidades".' : '') +
+        '<br><span style="font-size:12.5px">O Excel recalcula o ranking ao abrir o arquivo.</span>');
+    }
+  }catch(e){
+    alvo.innerHTML = bloco('erro','<strong>Falhou ao gerar:</strong> '+e.message);
+    console.error(e);
+  }finally{
+    botao.textContent = 'Gerar planilha';
+    if(!document.getElementById('etapa-3').classList.contains('concluida'))
+      botao.disabled = false;
+  }
+}
+
+/* ===================== inicialização ===================== */
+(async function(){
+  // Extrai a logo NORD do próprio modelo embutido: uma fonte só para a marca.
+  try{
+    const zip = await JSZip.loadAsync(bytesDoModelo());
+    const b64 = await zip.file('xl/media/image1.png').async('base64');
+    document.getElementById('logo-nord').src = 'data:image/png;base64,'+b64;
+  }catch(e){
+    document.getElementById('logo-nord').style.display='none';
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Saídas geradas durante testes
+*.saida.xlsx
+saida*.xlsx
+/tmp/
+node_modules/
+.DS_Store
+Thumbs.db
+~$*
