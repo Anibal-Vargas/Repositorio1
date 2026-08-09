@@ -20,8 +20,18 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
-  font-family:var(--fonte); background:var(--fundo); color:var(--grafite);
+  font-family:var(--fonte); background:var(--branco); color:var(--grafite);
   display:flex; flex-direction:column; min-height:100vh; font-size:15px;
+}
+
+/* Logo grande atrás do conteúdo, em todas as telas. Fica atrás de tudo
+   (z-index negativo) para o cabeçalho, o rodapé e os cartões — todos com
+   fundo opaco — cobrirem a marca d'água nessas áreas e só o vão do
+   .conteudo deixá-la aparecer. Um único elemento fixo cobre as 3 telas. */
+.marca-dagua{
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:min(58vw, 560px); opacity:.05; z-index:-1;
+  pointer-events:none; user-select:none;
 }
 
 /* ===== Estrutura ===== */
@@ -180,6 +190,8 @@ input[type=text]:focus{outline:2px solid var(--laranja); outline-offset:-1px; bo
 </style>
 </head>
 <body>
+
+<img class="marca-dagua" id="marca-dagua" alt="">
 
 <!-- ============================ TELA 1 ============================ -->
 <section class="tela ativa" id="tela-apresentacao">
@@ -760,13 +772,17 @@ async function gerar(){
 
 /* ===================== inicialização ===================== */
 (async function(){
-  // Extrai a logo NORD do próprio modelo embutido: uma fonte só para a marca.
+  // Extrai a logo NORD do próprio modelo embutido: uma fonte só para a marca
+  // (usada tanto no cabeçalho da tela 1 quanto na marca d'água de fundo).
   try{
     const zip = await JSZip.loadAsync(bytesDoModelo());
     const b64 = await zip.file('xl/media/image1.png').async('base64');
-    document.getElementById('logo-nord').src = 'data:image/png;base64,'+b64;
+    const src = 'data:image/png;base64,'+b64;
+    document.getElementById('logo-nord').src = src;
+    document.getElementById('marca-dagua').src = src;
   }catch(e){
     document.getElementById('logo-nord').style.display='none';
+    document.getElementById('marca-dagua').style.display='none';
   }
 })();
 </script>
