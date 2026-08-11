@@ -58,7 +58,9 @@ def gerar_todos(
         resultado["planilha"] = gerarPlanilhaResumo(
             pacote,
             os.path.join(pasta, f"Planilha Resumo - {base_nome}.xlsx"),
-            local=local,
+            # "Local:" da planilha: o informado na configuração, se houver;
+            # senão o nome do cliente que veio no pacote.
+            local=local if local is not None else (config.local or None),
             medicoes=medicoes,
             prolongador_padrao=config.prolongador_padrao,
             logo_cliente=(config.logo_cliente or None),

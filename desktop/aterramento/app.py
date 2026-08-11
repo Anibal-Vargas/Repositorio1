@@ -50,6 +50,7 @@ GRUPOS_CONFIG = [
         ("data_inspecao", "Data da inspeção (dd/mm/aaaa)"),
         ("unidade", "Unidade (capa dos laudos)"),
         ("proposta", "Nº da proposta (cabeçalho)"),
+        ("local", "Local (planilha) — opcional"),
     ]),
     ("Empresa responsável (Nord)", [
         ("engenheiro", "Engenheiro responsável"),
@@ -67,6 +68,9 @@ GRUPOS_CONFIG = [
         ("calibracao_validade", "Validade do certificado"),
     ]),
 ]
+
+# Campos que podem ficar em branco (não bloqueiam o botão Salvar).
+CAMPOS_OPCIONAIS = {"local"}
 
 # Campos que são escolhidos numa lista em vez de digitados.
 CAMPOS_OPCOES = {
@@ -182,7 +186,8 @@ class JanelaConfig(tk.Toplevel):
     def _validar(self, *_):
         if not hasattr(self, "btn_salvar"):
             return
-        completo = all(v.get().strip() for v in self._vars.values())
+        completo = all(v.get().strip() for attr, v in self._vars.items()
+                       if attr not in CAMPOS_OPCIONAIS)
         self.btn_salvar.config(state=("normal" if completo else "disabled"))
 
     def _grupo(self, pai, titulo):

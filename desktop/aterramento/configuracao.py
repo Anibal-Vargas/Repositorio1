@@ -24,6 +24,10 @@ class Configuracao:
     # Unidade do cliente (capa dos laudos: "UNIDADE: ...").
     unidade: str = ""
 
+    # Texto do campo "Local:" da planilha resumo. Em branco = usa o nome do
+    # cliente como veio no pacote (.zip).
+    local: str = ""
+
     # Nº da proposta (cabeçalho dos relatórios: "Proposta - <nº>").
     proposta: str = ""
 
