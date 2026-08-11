@@ -211,6 +211,7 @@ def gerarLaudoGeral(
     if nome_planilha:
         subs["Planilha resumo de resultado das medições - "
              "Aurora Fábrica Ração – Guatambu.xlsx"] = nome_planilha
+    subs.update(_subs_instrumento(doc, config))
     _aplicar_substituicoes(doc, subs)
     # Resistência do prolongador (valor vindo do pacote).
     valores_prol = _prolongadores_da_inspecao(pacote, config.prolongador_padrao)
@@ -311,16 +312,24 @@ def _aplicar_imagens_config(doc, config: Configuracao) -> None:
         _substituir_parte_imagem(doc, "image3.png", config.imagem_selo_calibracao)
 
 
-def _legenda_figura1(doc, config: Configuracao, subs: dict) -> None:
-    """Monta a legenda da Figura 1 com o instrumento e o modelo informados.
+def _subs_instrumento(doc, config: Configuracao) -> dict:
+    """Substituições dos dados do instrumento de medição.
 
-    No modelo a legenda é "Figura 1 – Miliohmímetro digital – MILLIOHM-1"; o
-    nome do instrumento aparece com inicial maiúscula e o modelo com hífen,
-    por isso ela é remontada em vez de substituída palavra a palavra.
+    São as mesmas nos dois laudos: a frase da metodologia, a frase com
+    modelo/fabricante, a legenda da Figura 1 e a descrição do aparelho.
+
+    A legenda é remontada (e não substituída palavra a palavra) porque nela o
+    nome do instrumento aparece com inicial maiúscula e o modelo com hífen.
     """
     import re
 
     instrumento = config.instrumento
+    subs = {
+        "miliohmímetro": instrumento,
+        "MILLIOHM 1": config.instrumento_modelo,
+        "fabricante Instrument,": f"fabricante {config.instrumento_fabricante},",
+        "correntes até 1,2 A": f"correntes até {config.instrumento_corrente}",
+    }
     instrumento_cap = instrumento[:1].upper() + instrumento[1:]
     for p in doc.paragraphs:
         m = re.match(r"(Figura\s*1\s*([–-])\s*)", p.text)
@@ -328,7 +337,8 @@ def _legenda_figura1(doc, config: Configuracao, subs: dict) -> None:
             traco = m.group(2)
             subs[p.text] = (f"{m.group(1)}{instrumento_cap} digital "
                             f"{traco} {config.instrumento_modelo}")
-            return
+            break
+    return subs
 
 
 def gerarLaudoIndividual(
@@ -387,13 +397,8 @@ def gerarLaudoIndividual(
         "certificado de calibração pelo fabricante na data 30/03/2026":
             f"certificado de calibração pelo fabricante na data "
             f"{config.calibracao_data}, com validade até {config.calibracao_validade}",
-        # Instrumento de medição (só no laudo individual)
-        "miliohmímetro": config.instrumento,
-        "MILLIOHM 1": config.instrumento_modelo,
-        "fabricante Instrument,": f"fabricante {config.instrumento_fabricante},",
-        "correntes até 1,2 A": f"correntes até {config.instrumento_corrente}",
     }
-    _legenda_figura1(doc, config, subs)
+    subs.update(_subs_instrumento(doc, config))
     # Linhas de MEDIÇÃO: resolve a string exata do modelo por prefixo (o modelo
     # usa o sinal de ohm U+2126, então reaproveitamos o caractere do próprio
     # texto em vez de digitá-lo).
