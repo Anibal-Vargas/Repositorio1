@@ -41,7 +41,7 @@ class Configuracao:
     imagem_selo_calibracao: str = ""  # selo/certificado de calibração
 
     # Instrumento de medição (usado apenas nos laudos individuais).
-    instrumento: str = "miliohmímetro"
+    instrumento: str = "miliohmímetro"   # "miliohmímetro" ou "microhmímetro"
     instrumento_modelo: str = "MILLIOHM 1"
     instrumento_fabricante: str = "Instrument"
     instrumento_corrente: str = "1,2 A"       # "1,2 A" ou "10 A"

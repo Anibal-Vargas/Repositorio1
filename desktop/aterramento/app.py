@@ -70,6 +70,7 @@ GRUPOS_CONFIG = [
 
 # Campos que são escolhidos numa lista em vez de digitados.
 CAMPOS_OPCOES = {
+    "instrumento": ["miliohmímetro", "microhmímetro"],
     "instrumento_corrente": ["1,2 A", "10 A"],
 }
 
@@ -199,8 +200,9 @@ class JanelaConfig(tk.Toplevel):
         if opcoes:
             if var.get() not in opcoes:
                 var.set(opcoes[0])
+            largura = max(len(o) for o in opcoes) + 3
             ttk.Combobox(linha, textvariable=var, values=opcoes,
-                         state="readonly", width=12).pack(side="left")
+                         state="readonly", width=largura).pack(side="left")
         else:
             tk.Entry(linha, textvariable=var).pack(side="left", fill="x",
                                                    expand=True)
