@@ -173,12 +173,26 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
 
     const campo = el('input', {
       type: 'text',
-      inputmode: 'decimal',
-      placeholder: 'Ex.: 850',
+      // Aceita números (ex.: 850) ou o texto ">2000"; text-only para permitir o ">".
+      placeholder: 'Ex.: 850 ou >2000',
       value: registro.valorMedido ?? '',
       disabled: somenteLeitura,
       oninput: (evento) => salvar(evento.target.value),
     });
+
+    // Botão que preenche o campo com o texto especial ">2000".
+    const botaoMaior = el(
+      'button',
+      {
+        class: 'btn btn-secundario',
+        type: 'button',
+        onclick: () => {
+          campo.value = '>2000';
+          campo.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+      },
+      '> 2000'
+    );
 
     return el(
       'section',
@@ -194,7 +208,10 @@ export async function telaRegistro(inspecaoId, equipamentoId) {
           campo,
           somenteLeitura ? null : botaoDitado(campo),
           el('span', { class: 'unidade' }, 'mΩ')
-        )
+        ),
+        somenteLeitura
+          ? null
+          : el('div', { class: 'atalho-valor' }, 'Fora de escala:', botaoMaior)
       )
     );
   }

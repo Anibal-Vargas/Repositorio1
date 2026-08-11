@@ -129,6 +129,18 @@ export async function telaEquipamentosDoSetor(inspecaoId, setorId) {
       campoNome.focus();
       return;
     }
+    // Avisa se já existe uma máquina de mesmo nome (parte descritiva) no setor.
+    const duplicada = equipamentos.some(
+      (e) => separarNomeEquipamento(e.nome).descricao.toLowerCase() === nome.toLowerCase()
+    );
+    if (
+      duplicada &&
+      !confirm(
+        `Já existe uma máquina/equipamento com o nome "${nome}" neste setor. Confirma criar outra com o mesmo nome no mesmo setor?`
+      )
+    ) {
+      return;
+    }
     const equipamentoId = await criarEquipamento(inspecao.clienteId, setorId, nome, inspecaoId);
     toast('Máquina/equipamento criada.');
     await incluir(equipamentoId);

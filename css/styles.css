@@ -534,6 +534,21 @@ textarea {
   color: var(--cinza);
 }
 
+.atalho-valor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--cinza);
+}
+
+.atalho-valor .btn {
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0.3rem 0.9rem;
+}
+
 /* ============================================================
    Fotos
    ============================================================ */
