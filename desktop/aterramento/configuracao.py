@@ -40,6 +40,12 @@ class Configuracao:
     imagem_equipamento: str = ""      # foto do miliohmímetro (Figura 1)
     imagem_selo_calibracao: str = ""  # selo/certificado de calibração
 
+    # Instrumento de medição (usado apenas nos laudos individuais).
+    instrumento: str = "miliohmímetro"
+    instrumento_modelo: str = "MILLIOHM 1"
+    instrumento_fabricante: str = "Instrument"
+    instrumento_corrente: str = "1,2 A"       # "1,2 A" ou "10 A"
+
     # Datas do certificado de calibração.
     calibracao_data: str = "30/03/2026"       # data de aferição/emissão
     calibracao_validade: str = "30/03/2027"   # validade do certificado

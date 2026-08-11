@@ -56,11 +56,22 @@ GRUPOS_CONFIG = [
         ("crea", "CREA"),
         ("cidade", "Cidade (assinatura)"),
     ]),
+    ("Instrumento de medição (laudos individuais)", [
+        ("instrumento", "Instrumento"),
+        ("instrumento_modelo", "Modelo"),
+        ("instrumento_fabricante", "Fabricante"),
+        ("instrumento_corrente", "Corrente"),
+    ]),
     ("Certificado de calibração", [
         ("calibracao_data", "Data de aferição"),
         ("calibracao_validade", "Validade do certificado"),
     ]),
 ]
+
+# Campos que são escolhidos numa lista em vez de digitados.
+CAMPOS_OPCOES = {
+    "instrumento_corrente": ["1,2 A", "10 A"],
+}
 
 # Campos de imagem (seletores de arquivo).
 CAMPOS_IMAGEM = [
@@ -184,7 +195,15 @@ class JanelaConfig(tk.Toplevel):
                  anchor="w").pack(side="left")
         var = tk.StringVar(value=str(getattr(self.config_obj, attr, "")))
         self._vars[attr] = var
-        tk.Entry(linha, textvariable=var).pack(side="left", fill="x", expand=True)
+        opcoes = CAMPOS_OPCOES.get(attr)
+        if opcoes:
+            if var.get() not in opcoes:
+                var.set(opcoes[0])
+            ttk.Combobox(linha, textvariable=var, values=opcoes,
+                         state="readonly", width=12).pack(side="left")
+        else:
+            tk.Entry(linha, textvariable=var).pack(side="left", fill="x",
+                                                   expand=True)
 
     def _campo_arquivo(self, pai, attr, rotulo):
         linha = tk.Frame(pai, bg=BRANCO)

@@ -311,6 +311,26 @@ def _aplicar_imagens_config(doc, config: Configuracao) -> None:
         _substituir_parte_imagem(doc, "image3.png", config.imagem_selo_calibracao)
 
 
+def _legenda_figura1(doc, config: Configuracao, subs: dict) -> None:
+    """Monta a legenda da Figura 1 com o instrumento e o modelo informados.
+
+    No modelo a legenda é "Figura 1 – Miliohmímetro digital – MILLIOHM-1"; o
+    nome do instrumento aparece com inicial maiúscula e o modelo com hífen,
+    por isso ela é remontada em vez de substituída palavra a palavra.
+    """
+    import re
+
+    instrumento = config.instrumento
+    instrumento_cap = instrumento[:1].upper() + instrumento[1:]
+    for p in doc.paragraphs:
+        m = re.match(r"(Figura\s*1\s*([–-])\s*)", p.text)
+        if m:
+            traco = m.group(2)
+            subs[p.text] = (f"{m.group(1)}{instrumento_cap} digital "
+                            f"{traco} {config.instrumento_modelo}")
+            return
+
+
 def gerarLaudoIndividual(
     equipamento: Equipamento,
     config: Configuracao,
@@ -367,7 +387,13 @@ def gerarLaudoIndividual(
         "certificado de calibração pelo fabricante na data 30/03/2026":
             f"certificado de calibração pelo fabricante na data "
             f"{config.calibracao_data}, com validade até {config.calibracao_validade}",
+        # Instrumento de medição (só no laudo individual)
+        "miliohmímetro": config.instrumento,
+        "MILLIOHM 1": config.instrumento_modelo,
+        "fabricante Instrument,": f"fabricante {config.instrumento_fabricante},",
+        "correntes até 1,2 A": f"correntes até {config.instrumento_corrente}",
     }
+    _legenda_figura1(doc, config, subs)
     # Linhas de MEDIÇÃO: resolve a string exata do modelo por prefixo (o modelo
     # usa o sinal de ohm U+2126, então reaproveitamos o caractere do próprio
     # texto em vez de digitá-lo).
