@@ -23,6 +23,7 @@ from . import pdf
 from .configuracao import Configuracao
 from .geracao import gerar_todos
 from .leitor import lerPacote, limparPacote
+from .modelo import FORA_DE_FAIXA
 from .recursos import caminho_recurso
 
 # Paleta Nord Consult.
@@ -48,6 +49,7 @@ GRUPOS_CONFIG = [
     ("Inspeção", [
         ("data_inspecao", "Data da inspeção (dd/mm/aaaa)"),
         ("unidade", "Unidade (capa dos laudos)"),
+        ("proposta", "Nº da proposta (cabeçalho)"),
     ]),
     ("Empresa responsável (Nord)", [
         ("engenheiro", "Engenheiro responsável"),
@@ -250,20 +252,25 @@ class LinhaResumo(tk.Frame):
 
         valor = equipamento.valor_medido
         prol = equipamento.prolongador
-        efetiva = None if valor is None else valor - (prol or 0)
-        if efetiva is None:
-            situacao, cor = "sem valor", CINZA
-        elif efetiva <= LIMITE_ADEQUADO:
-            situacao, cor = "ESTÁ", VERDE
-        else:
+        if equipamento.fora_de_faixa:
+            texto_valor = texto_efetiva = FORA_DE_FAIXA
+            prol = 0  # acima da escala: nada a descontar
             situacao, cor = "NÃO ESTÁ", VERMELHO
+        elif valor is None:
+            texto_valor = texto_efetiva = "—"
+            situacao, cor = "sem valor", CINZA
+        else:
+            efetiva = valor - (prol or 0)
+            texto_valor, texto_efetiva = _fmt_num(valor), _fmt_num(efetiva)
+            situacao, cor = (("ESTÁ", VERDE) if efetiva <= LIMITE_ADEQUADO
+                             else ("NÃO ESTÁ", VERMELHO))
 
         colunas = [
             (equipamento.nome, 32, "w", GRAFITE),
             (equipamento.setor or "—", 22, "w", CINZA),
-            (_fmt_num(valor), 10, "center", GRAFITE),
+            (texto_valor, 10, "center", GRAFITE),
             (_fmt_num(prol), 10, "center", GRAFITE),
-            (_fmt_num(efetiva), 10, "center", GRAFITE),
+            (texto_efetiva, 10, "center", GRAFITE),
             (situacao, 10, "center", cor),
         ]
         for texto, larg, ancora, fg in colunas:

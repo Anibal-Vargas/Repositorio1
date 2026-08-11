@@ -88,7 +88,8 @@ def gerar_todos(
         from . import pdf as _pdf
 
         resultado["pdf_erro"] = None
-        docs = [resultado["planilha"], resultado["geral"], *resultado["individuais"]]
+        # PDF apenas dos laudos — a planilha não é convertida.
+        docs = [resultado["geral"], *resultado["individuais"]]
         for doc in docs:
             if not doc:
                 continue

@@ -24,7 +24,7 @@ import openpyxl
 from openpyxl.styles import Border, PatternFill
 
 from .imagens import encaixar
-from .modelo import Pacote
+from .modelo import FORA_DE_FAIXA, Pacote
 from .recursos import caminho_recurso
 
 MODELO_PADRAO = caminho_recurso("modelos", "Planilha_Medicoes_Padrao.xlsx")
@@ -127,10 +127,15 @@ def gerarPlanilhaResumo(
             cell.alignment = copy(align)
             cell.number_format = numfmt
 
-        ws.cell(r, 2).value = f"{(e.numero or i + 1):02d}"  # ITEM (texto)
-        ws.cell(r, 2).number_format = "@"
+        # ITEM: número de verdade, exibido com dois dígitos (01, 02, … 10, 11).
+        ws.cell(r, 2).value = e.numero or (i + 1)
+        ws.cell(r, 2).number_format = "00"
         ws.cell(r, 3).value = e.nome_sem_numero or e.nome    # MÁQUINA
         ws.cell(r, 4).value = e.setor                        # SETOR
+
+        fora_faixa = valor == FORA_DE_FAIXA
+        if fora_faixa:
+            prolongador = 0                                  # regra do ">2000"
 
         if valor is not None:
             ws.cell(r, 5).value = valor                      # VALOR MEDIDO
@@ -139,6 +144,8 @@ def gerarPlanilhaResumo(
             ws.cell(r, 8).value = (
                 f'=IF(OR(G{r}>1000,G{r}=">2000"),"NÃO ESTÁ","ESTÁ")'
             )
+            if fora_faixa:
+                ws.cell(r, 5).number_format = "General"
         else:
             # Sem valor medido (máquina pendente): deixa E..H em branco.
             for col in (5, 6, 7, 8):
@@ -147,7 +154,9 @@ def gerarPlanilhaResumo(
         # Observação padrão pela adequação: "ESTÁ" -> em branco; "NÃO ESTÁ"
         # (resistência efetiva > 1000 mΩ) -> "CORREÇÃO CONFORME FLUXOGRAMA".
         obs = ""
-        if valor is not None:
+        if fora_faixa:
+            obs = "CORREÇÃO CONFORME FLUXOGRAMA"
+        elif valor is not None:
             efetiva = valor - (prolongador if prolongador is not None else 0)
             if efetiva > 1000:
                 obs = "CORREÇÃO CONFORME FLUXOGRAMA"

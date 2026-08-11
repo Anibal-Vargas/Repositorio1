@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import re
 
+# Texto gravado pelo aplicativo de campo quando a medição fica acima da escala
+# do miliohmímetro. É o mesmo texto reconhecido pelas fórmulas da planilha.
+FORA_DE_FAIXA = ">2000"
+
 
 @dataclass
 class Cliente:
@@ -42,8 +46,14 @@ class Equipamento:
     observacao: str = ""
     # Resistência do prolongador (PT), em mΩ, vinda de prolongador.txt.
     prolongador: float | None = None
-    # Valor medido (mΩ), lido do pacote (.zip) — editável/confirmável no app.
-    valor_medido: float | None = None
+    # Valor medido (mΩ), lido do pacote (.zip). Pode ser o texto ">2000"
+    # (fora de faixa do miliohmímetro) — ver :data:`FORA_DE_FAIXA`.
+    valor_medido: float | str | None = None
+
+    @property
+    def fora_de_faixa(self) -> bool:
+        """True quando o valor medido veio como ">2000" (acima da escala)."""
+        return self.valor_medido == FORA_DE_FAIXA
     # Fotos por categoria -> caminhos absolutos no disco (após extração).
     fotos: dict[str, list[str]] = field(default_factory=dict)
     # Áudios -> caminhos absolutos no disco.

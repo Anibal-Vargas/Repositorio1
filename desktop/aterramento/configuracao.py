@@ -24,6 +24,9 @@ class Configuracao:
     # Unidade do cliente (capa dos laudos: "UNIDADE: ...").
     unidade: str = ""
 
+    # Nº da proposta (cabeçalho dos relatórios: "Proposta - <nº>").
+    proposta: str = ""
+
     # Cidade da assinatura ("<cidade>, <data por extenso>").
     cidade: str = "Chapecó – SC"
 

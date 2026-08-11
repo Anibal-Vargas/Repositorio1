@@ -19,7 +19,7 @@ import docx
 
 from .configuracao import Configuracao
 from .imagens import encaixar
-from .modelo import Equipamento, Pacote
+from .modelo import FORA_DE_FAIXA, Equipamento, Pacote
 from .recursos import caminho_recurso
 
 MODELO_GERAL = caminho_recurso("modelos", "Laudo_Geral_Padrao.docx")
@@ -73,15 +73,24 @@ def _substituir_no_paragrafo(paragrafo, antigo: str, novo: str) -> bool:
     return True
 
 
-def _iter_paragrafos(doc):
-    yield from doc.paragraphs
-    for tabela in doc.tables:
+def _paragrafos_de(container):
+    """Todos os parágrafos de um container, inclusive dentro de tabelas."""
+    yield from container.paragraphs
+    for tabela in container.tables:
         for linha in tabela.rows:
             for celula in linha.cells:
-                yield from celula.paragraphs
+                yield from _paragrafos_de(celula)
+
+
+def _iter_paragrafos(doc):
+    yield from _paragrafos_de(doc)
     for secao in doc.sections:
-        for cab in (secao.header, secao.footer):
-            yield from cab.paragraphs
+        # Cabeçalhos/rodapés também podem ter tabelas (é onde fica a proposta).
+        for cab in (secao.header, secao.footer,
+                    secao.first_page_header, secao.first_page_footer,
+                    secao.even_page_header, secao.even_page_footer):
+            if cab is not None:
+                yield from _paragrafos_de(cab)
 
 
 def _aplicar_substituicoes(doc, substituicoes: dict) -> None:
@@ -115,8 +124,12 @@ def _prolongadores_da_inspecao(pacote: Pacote, padrao: float) -> list[float]:
 
     Normalmente é um único valor (o mesmo cabo em todas as medições).
     """
+    # Um zero vindo de máquina fora de faixa (">2000") não representa um cabo
+    # e por isso fica de fora da lista.
     valores = sorted({
-        e.prolongador for e in pacote.equipamentos if e.prolongador is not None
+        e.prolongador for e in pacote.equipamentos
+        if e.prolongador is not None
+        and not (e.fora_de_faixa and e.prolongador == 0)
     })
     return valores or [padrao]
 
@@ -188,6 +201,8 @@ def gerarLaudoGeral(
         # Engenheiro
         "Aníbal Rosa Vargas": config.engenheiro,
         "CREA-SC – 069788-5": f"CREA-SC – {config.crea}",
+        # Nº da proposta (cabeçalho: "Proposta - <nº>")
+        "102PC26AUR": config.proposta or "102PC26AUR",
         # Certificado de calibração — data e validade
         "certificado de calibração pelo fabricante na data 30/03/2026":
             f"certificado de calibração pelo fabricante na data "
@@ -300,15 +315,16 @@ def gerarLaudoIndividual(
     equipamento: Equipamento,
     config: Configuracao,
     data_medicoes,
-    valor_medido: float,
+    valor_medido: float | str,
     caminho_saida: str,
     prolongador: float | None = None,
     modelo: str | None = None,
 ) -> str:
     """Gera o laudo individual (.docx) de uma máquina preenchendo o modelo.
 
-    ``valor_medido`` em mΩ (informado/confirmado pelo operador). ``prolongador``
-    em mΩ; se None, usa o do equipamento ou o padrão da configuração.
+    ``valor_medido`` em mΩ, ou o texto ">2000" quando a medição ficou acima da
+    escala do miliohmímetro. ``prolongador`` em mΩ; se None, usa o do
+    equipamento ou o padrão da configuração.
     """
     doc = docx.Document(modelo or MODELO_INDIVIDUAL)
     if prolongador is None:
@@ -317,8 +333,21 @@ def gerarLaudoIndividual(
             if equipamento.prolongador is not None
             else config.prolongador_padrao
         )
-    efetiva = valor_medido - prolongador
-    adequado = efetiva <= LIMITE_ADEQUADO
+    # Resistência do próprio cabo (usada na frase da metodologia).
+    prolongador_cabo = prolongador
+
+    fora_faixa = valor_medido == FORA_DE_FAIXA
+    if fora_faixa:
+        # Acima da escala: nada a descontar e resultado inadequado.
+        prolongador = 0.0
+        texto_valor = FORA_DE_FAIXA
+        texto_efetiva = FORA_DE_FAIXA
+        adequado = False
+    else:
+        efetiva = valor_medido - prolongador
+        texto_valor = _fmt(valor_medido)
+        texto_efetiva = _fmt(efetiva)
+        adequado = efetiva <= LIMITE_ADEQUADO
     data_ext = data_por_extenso(data_medicoes)
     # (a) Na capa, o nome do equipamento vai SEM o prefixo numérico "NN - ".
     nome_upper = equipamento.nome_sem_numero.upper()
@@ -332,6 +361,8 @@ def gerarLaudoIndividual(
         # Engenheiro
         "Aníbal Rosa Vargas": config.engenheiro,
         "CREA-SC – 069788-5": f"CREA-SC – {config.crea}",
+        # Nº da proposta (cabeçalho: "Proposta - <nº>")
+        "102PC26AUR": config.proposta or "102PC26AUR",
         # Certificado de calibração — data e validade
         "certificado de calibração pelo fabricante na data 30/03/2026":
             f"certificado de calibração pelo fabricante na data "
@@ -341,10 +372,11 @@ def gerarLaudoIndividual(
     # usa o sinal de ohm U+2126, então reaproveitamos o caractere do próprio
     # texto em vez de digitá-lo).
     medicao = {
-        "Valor medido = ": _fmt(valor_medido),
+        "Valor medido = ": texto_valor,
         "Resistência elétrica do cabo prolongador PT = ": _fmt(prolongador),
-        "Resistência elétrica de aterramento efetiva = ": _fmt(efetiva),
-        "Resistência elétrica do cabo prolongador = ": _fmt(prolongador),
+        "Resistência elétrica de aterramento efetiva = ": texto_efetiva,
+        # Frase da metodologia: resistência do próprio cabo prolongador.
+        "Resistência elétrica do cabo prolongador = ": _fmt(prolongador_cabo),
     }
     for p in doc.paragraphs:
         for prefixo, valor in medicao.items():

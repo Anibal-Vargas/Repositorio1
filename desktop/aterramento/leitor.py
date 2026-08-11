@@ -25,7 +25,7 @@ import re
 import tempfile
 import zipfile
 
-from .modelo import Cliente, Equipamento, Inspecao, Pacote
+from .modelo import FORA_DE_FAIXA, Cliente, Equipamento, Inspecao, Pacote
 
 # Extensões reconhecidas.
 EXT_IMAGEM = {".jpg", ".jpeg", ".png"}
@@ -72,17 +72,33 @@ def _num_generico(valor) -> float | None:
     return _num_ptbr(str(valor))
 
 
-def _ler_valor_medido(pasta_abs: str, eq_json: dict | None) -> float | None:
+def _eh_fora_de_faixa(valor) -> bool:
+    """Reconhece o texto ">2000" (tolerando espaços) do valor medido."""
+    if valor is None or isinstance(valor, (int, float)):
+        return False
+    return str(valor).replace(" ", "").strip() == FORA_DE_FAIXA
+
+
+def _ler_valor_medido(pasta_abs: str, eq_json: dict | None) -> float | str | None:
     """Lê o valor medido (mΩ) do dados.json (vários nomes de campo) ou de um
-    arquivo de texto na pasta da máquina."""
+    arquivo de texto na pasta da máquina.
+
+    Devolve o número ou o texto :data:`FORA_DE_FAIXA` (">2000").
+    """
     if eq_json:
         for chave in _CHAVES_VALOR_JSON:
             if chave in eq_json:
-                v = _num_generico(eq_json.get(chave))
+                bruto = eq_json.get(chave)
+                if _eh_fora_de_faixa(bruto):
+                    return FORA_DE_FAIXA
+                v = _num_generico(bruto)
                 if v is not None:
                     return v
     for nome in _ARQUIVOS_VALOR:
-        v = _num_ptbr(_texto(os.path.join(pasta_abs, nome)))
+        bruto = _texto(os.path.join(pasta_abs, nome))
+        if _eh_fora_de_faixa(bruto):
+            return FORA_DE_FAIXA
+        v = _num_ptbr(bruto)
         if v is not None:
             return v
     return None
@@ -187,6 +203,18 @@ def _pasta_absoluta(diretorio: str, pasta_rel: str) -> str:
     return os.path.join(diretorio, *pasta_rel.split("/")) if pasta_rel else diretorio
 
 
+def _normalizar(equipamentos: list[Equipamento]) -> None:
+    """Ajustes comuns aos dois caminhos de leitura.
+
+    Ordena numericamente pelo prefixo "NN - " do nome (10 vem antes de 11 e de
+    100), mantendo ao final os que não têm número.
+
+    O prolongador é preservado como veio no pacote: a regra do ">2000"
+    (descontar zero) é aplicada no cálculo, em cada documento gerado.
+    """
+    equipamentos.sort(key=lambda e: (e.numero is None, e.numero or 0, e.nome))
+
+
 def _ler_de_dados_json(diretorio: str, dados: dict) -> Pacote:
     cliente_json = dados.get("cliente") or {}
     inspecao_json = dados.get("inspecao") or {}
@@ -233,6 +261,7 @@ def _ler_de_dados_json(diretorio: str, dados: dict) -> Pacote:
             )
         )
 
+    _normalizar(equipamentos)
     return Pacote(
         cliente=cliente,
         inspecao=inspecao,
@@ -270,8 +299,7 @@ def _ler_de_pastas(diretorio: str) -> Pacote:
                     audios=_resolver_audios(pasta_abs, None),
                 )
             )
-    # Ordena por número do prefixo quando existir.
-    equipamentos.sort(key=lambda e: (e.numero is None, e.numero or 0, e.nome))
+    _normalizar(equipamentos)
     return Pacote(
         cliente=Cliente(),
         inspecao=Inspecao(),
