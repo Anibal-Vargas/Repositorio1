@@ -279,8 +279,8 @@ class LinhaResumo(tk.Frame):
         valor = equipamento.valor_medido
         prol = equipamento.prolongador
         if equipamento.fora_de_faixa:
+            # O prolongador é mantido; acima da escala não há o que descontar.
             texto_valor = texto_efetiva = FORA_DE_FAIXA
-            prol = 0  # acima da escala: nada a descontar
             situacao, cor = "NÃO ESTÁ", VERMELHO
         elif valor is None:
             texto_valor = texto_efetiva = "—"

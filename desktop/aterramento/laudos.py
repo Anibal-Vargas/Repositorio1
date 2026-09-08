@@ -124,12 +124,8 @@ def _prolongadores_da_inspecao(pacote: Pacote, padrao: float) -> list[float]:
 
     Normalmente é um único valor (o mesmo cabo em todas as medições).
     """
-    # Um zero vindo de máquina fora de faixa (">2000") não representa um cabo
-    # e por isso fica de fora da lista.
     valores = sorted({
-        e.prolongador for e in pacote.equipamentos
-        if e.prolongador is not None
-        and not (e.fora_de_faixa and e.prolongador == 0)
+        e.prolongador for e in pacote.equipamentos if e.prolongador is not None
     })
     return valores or [padrao]
 
@@ -394,8 +390,8 @@ def gerarLaudoIndividual(
 
     fora_faixa = valor_medido == FORA_DE_FAIXA
     if fora_faixa:
-        # Acima da escala: nada a descontar e resultado inadequado.
-        prolongador = 0.0
+        # Acima da escala: o prolongador é mantido como veio no pacote, mas
+        # não há o que descontar — a efetiva também fica ">2000".
         texto_valor = FORA_DE_FAIXA
         texto_efetiva = FORA_DE_FAIXA
         adequado = False

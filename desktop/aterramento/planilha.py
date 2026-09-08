@@ -133,9 +133,9 @@ def gerarPlanilhaResumo(
         ws.cell(r, 3).value = e.nome_sem_numero or e.nome    # MÁQUINA
         ws.cell(r, 4).value = e.setor                        # SETOR
 
+        # Em ">2000" o prolongador vem do pacote como qualquer outra medição;
+        # a fórmula da coluna G já devolve ">2000" sem descontá-lo.
         fora_faixa = valor == FORA_DE_FAIXA
-        if fora_faixa:
-            prolongador = 0                                  # regra do ">2000"
 
         if valor is not None:
             ws.cell(r, 5).value = valor                      # VALOR MEDIDO
