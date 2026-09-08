@@ -272,16 +272,42 @@ def _preparar_foto(caminho: str, formato: str, proporcao: float,
     return buf.getvalue()
 
 
-def _trocar_imagem(doc, inline_shape, caminho_foto: str) -> None:
+def _foto_existente(fotos: list[str]) -> str | None:
+    """Primeira foto da lista que exista em disco, ou None."""
+    for caminho in fotos:
+        if caminho and os.path.exists(caminho):
+            return caminho
+    return None
+
+
+def _blob_em_branco(formato: str, proporcao: float, altura: int = 700) -> bytes:
+    """Imagem totalmente branca, para o lugar de uma foto que falta no pacote."""
+    from PIL import Image
+
+    largura = max(1, int(round(altura * proporcao)))
+    branco = Image.new("RGB", (largura, altura), (255, 255, 255))
+    buf = io.BytesIO()
+    branco.save(buf, "PNG" if formato == "png" else "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def _trocar_imagem(doc, inline_shape, caminho_foto: str | None) -> None:
     """Substitui a imagem de um inline shape pela foto, fixando o tamanho em
-    ``FOTO_LARGURA_CM`` x ``FOTO_ALTURA_CM`` (sem distorcer o conteúdo)."""
+    ``FOTO_LARGURA_CM`` x ``FOTO_ALTURA_CM`` (sem distorcer o conteúdo).
+
+    Com ``caminho_foto`` None (foto ausente no pacote), o espaço fica **em
+    branco** — nunca com a foto de exemplo do modelo.
+    """
     from docx.shared import Cm
 
     rId = inline_shape._inline.graphic.graphicData.pic.blipFill.blip.embed
     parte = doc.part.related_parts[rId]
     formato = "png" if "png" in (parte.content_type or "") else "jpeg"
     proporcao = FOTO_LARGURA_CM / FOTO_ALTURA_CM
-    parte._blob = _preparar_foto(caminho_foto, formato, proporcao)
+    if caminho_foto:
+        parte._blob = _preparar_foto(caminho_foto, formato, proporcao)
+    else:
+        parte._blob = _blob_em_branco(formato, proporcao)
     inline_shape.width = Cm(FOTO_LARGURA_CM)
     inline_shape.height = Cm(FOTO_ALTURA_CM)
 
@@ -434,14 +460,12 @@ def gerarLaudoIndividual(
 
     # Troca as duas fotos variáveis (as duas últimas imagens do modelo):
     # penúltima = equipamento (foto 01), última = valor medido (foto 02).
+    # As duas são SEMPRE substituídas: faltando a foto no pacote, o espaço fica
+    # em branco — nunca com a foto de exemplo que vem no modelo.
     imagens = doc.inline_shapes
-    foto_maquina = equipamento.fotos_maquina[0] if equipamento.fotos_maquina else None
-    foto_valor = equipamento.fotos_valor[0] if equipamento.fotos_valor else None
     if len(imagens) >= 2:
-        if foto_maquina and os.path.exists(foto_maquina):
-            _trocar_imagem(doc, imagens[-2], foto_maquina)
-        if foto_valor and os.path.exists(foto_valor):
-            _trocar_imagem(doc, imagens[-1], foto_valor)
+        _trocar_imagem(doc, imagens[-2], _foto_existente(equipamento.fotos_maquina))
+        _trocar_imagem(doc, imagens[-1], _foto_existente(equipamento.fotos_valor))
 
     _aplicar_imagens_config(doc, config)  # (d)(e) logo, equipamento, selo
 

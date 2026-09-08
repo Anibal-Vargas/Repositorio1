@@ -482,6 +482,21 @@ class Aplicativo(tk.Tk):
             if not ok:
                 return
 
+        # Fotos obrigatórias ausentes: o laudo sai com o espaço em branco.
+        sem_foto = [(eq.nome, eq.fotos_faltando)
+                    for eq in self.pacote.equipamentos
+                    if eq.chave in medicoes and eq.fotos_faltando]
+        if sem_foto:
+            itens = "\n".join(f"- {nome}: falta a foto {', '.join(faltando)}"
+                              for nome, faltando in sem_foto)
+            ok = messagebox.askyesno(
+                "Máquinas sem foto",
+                "Estas máquinas não têm todas as fotos no pacote. O laudo será "
+                "gerado com o espaço da foto EM BRANCO:\n\n" + itens
+                + "\n\nContinuar?")
+            if not ok:
+                return
+
         pasta = filedialog.askdirectory(
             title="Escolha a pasta para salvar os laudos e planilha")
         if not pasta:
@@ -545,6 +560,15 @@ class Aplicativo(tk.Tk):
                        f"• Planilha resumo\n• Laudo geral\n"
                        f"• {n} laudo(s) individual(is)\n{pdf_linha}\n"
                        "O que deseja fazer agora?")).pack(anchor="w")
+        # Laudos que saíram com o espaço da foto em branco.
+        sem_foto = res.get("sem_foto") or []
+        if sem_foto:
+            itens = "\n".join(f"   - {nome}: falta a foto {', '.join(faltando)}"
+                              for nome, faltando in sem_foto)
+            tk.Label(dlg, bg=BRANCO, fg=VERMELHO, justify="left",
+                     padx=20, pady=(0), font=("Segoe UI", 9),
+                     text=("Atenção — laudo(s) gerado(s) com o espaço da foto "
+                           "em branco:\n" + itens)).pack(anchor="w")
         botoes = tk.Frame(dlg, bg=BRANCO)
         botoes.pack(fill="x", padx=16, pady=(0, 16))
 

@@ -51,7 +51,7 @@ def gerar_todos(
     os.makedirs(pasta, exist_ok=True)
 
     resultado = {"pasta": pasta, "planilha": None, "geral": None,
-                 "individuais": [], "pdfs": []}
+                 "individuais": [], "pdfs": [], "sem_foto": []}
     base_nome = _seguro(f"{cliente} - {data_str}")
 
     if gerar_planilha:
@@ -85,6 +85,12 @@ def gerar_todos(
             medicoes,
             os.path.join(pasta, "Laudos Individuais"),
         )
+        # Laudos gerados com espaço em branco no lugar de uma foto ausente.
+        resultado["sem_foto"] = [
+            (e.nome, e.fotos_faltando)
+            for e in pacote.equipamentos
+            if e.chave in medicoes and e.fotos_faltando
+        ]
 
     if gerar_pdf:
         from . import pdf as _pdf

@@ -118,6 +118,17 @@ class Equipamento:
         return resultado
 
     @property
+    def fotos_faltando(self) -> list[str]:
+        """Fotos obrigatórias ausentes no pacote (o laudo sai com o espaço em
+        branco no lugar delas)."""
+        faltando: list[str] = []
+        if not self.fotos_maquina:
+            faltando.append("01 (equipamento)")
+        if not self.fotos_valor:
+            faltando.append("02 (valor medido)")
+        return faltando
+
+    @property
     def motivos_pendencia(self) -> list[str]:
         """Lista de itens obrigatórios faltando. Vazia = item completo (OK)."""
         motivos: list[str] = []
