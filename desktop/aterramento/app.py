@@ -19,7 +19,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import pdf
+from . import VERSAO, atualizacao, pdf
 from .configuracao import Configuracao
 from .geracao import gerar_todos
 from .leitor import lerPacote, limparPacote
@@ -40,9 +40,10 @@ CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".aterramento", "config.json
 # Texto exibido na barra (cabeçalho) das telas.
 TITULO = "Gerador de documentos de medições de continuidade de aterramento elétrico"
 
-# Título da janela do sistema (canto superior esquerdo).
+# Título da janela do sistema (canto superior esquerdo). A versão aparece no
+# final para que se saiba, sem abrir nada, qual versão está rodando.
 TITULO_JANELA = ("Medição de continuidade de aterramento elétrico de "
-                 "máquinas e equipamentos")
+                 f"máquinas e equipamentos — v{VERSAO}")
 
 # Rótulos amigáveis dos campos de configuração (ordem de exibição por grupo).
 GRUPOS_CONFIG = [
@@ -621,6 +622,11 @@ class Aplicativo(tk.Tk):
 
 
 def main():
+    # Havendo versão nova na pasta de rede, o app se atualiza e reabre sozinho.
+    # Qualquer problema (rede fora, sem permissão) é ignorado: o app abre na
+    # versão atual e o motivo fica registrado no atualizacao.log.
+    if atualizacao.checar_e_atualizar():
+        return
     app = Aplicativo()
     app.mainloop()
 

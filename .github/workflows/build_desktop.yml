@@ -94,6 +94,10 @@ jobs:
           }
           $info | ConvertTo-Json | Set-Content -Encoding utf8 "dist\versao.json"
 
+          # Scripts de publicação/instalação na pasta de rede vão junto.
+          Copy-Item "rede\publicar.bat" "dist\" -Force
+          Copy-Item "rede\Instalar_Aterramento.bat" "dist\" -Force
+
           "nome=$nome" >> $env:GITHUB_OUTPUT
           $tamanho = [math]::Round((Get-Item "dist\$nome").Length / 1MB, 1)
           Write-Host "Gerado: $nome ($tamanho MB)"
@@ -105,6 +109,7 @@ jobs:
           path: |
             desktop/dist/RelatoriosAterramento_*.exe
             desktop/dist/versao.json
+            desktop/dist/*.bat
           retention-days: 90
 
       - name: Publicar a Release
@@ -127,8 +132,10 @@ jobs:
           }
           $PSNativeCommandUseErrorActionPreference = $true
 
-          gh release create $tag "dist/$nome" "dist/versao.json" `
+          gh release create $tag `
+            "dist/$nome" "dist/versao.json" `
+            "dist/publicar.bat" "dist/Instalar_Aterramento.bat" `
             --title "App desktop $tag" `
-            --notes "Executável gerado automaticamente a partir do commit ${{ github.sha }}.`n`nBaixe o **$nome** e rode no Windows - não precisa instalar Python." `
+            --notes "Executável gerado automaticamente a partir do commit ${{ github.sha }}.`n`n**Para usar direto:** baixe o **$nome** e rode no Windows - não precisa instalar Python.`n`n**Para publicar na pasta de rede:** baixe o .exe, o ``versao.json`` e o ``publicar.bat`` para uma mesma pasta e rode ``publicar.bat \\servidor\NordConsult\Aterramento``." `
             --target "${{ github.sha }}"
           Write-Host "Release publicada: $tag"

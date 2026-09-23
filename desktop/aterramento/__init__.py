@@ -20,4 +20,4 @@ __all__ = [
 # Versão do aplicativo. É ela que nomeia o executável e a Release gerados
 # automaticamente pelo workflow .github/workflows/build_desktop.yml — altere
 # aqui antes de publicar uma versão nova.
-VERSAO = "1.0.0"
+VERSAO = "1.1.0"

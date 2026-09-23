@@ -163,6 +163,50 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   `desktop` (requer Python instalado). Ao final, o executável fica em
   `dist\RelatoriosAterramento.exe` e roda sem precisar de Python.
 
+## Distribuição pela pasta de rede (auto-atualização)
+
+Cada usuário roda uma **cópia local** do `.exe` e o app se atualiza sozinho a
+partir de uma pasta compartilhada. Rodar direto da rede foi descartado: o
+Windows trava o `.exe` em uso, impedindo publicar versão nova durante o
+expediente, e a abertura fica lenta.
+
+**Conteúdo da pasta de rede** (ex.: `\\servidor\NordConsult\Aterramento`):
+
+```
+versao.json                       ← versão "ligada" no momento
+RelatoriosAterramento_1.1.0.exe
+Instalar_Aterramento.bat
+```
+
+**Publicar uma versão nova** (quem administra o servidor, uma vez por versão):
+
+1. em **Code → Releases**, baixe para uma mesma pasta os anexos
+   `RelatoriosAterramento_<versão>.exe`, `versao.json` e `publicar.bat`;
+2. rode `publicar.bat \\servidor\NordConsult\Aterramento`.
+
+O `.exe` é copiado primeiro e o `versao.json` por último — assim ninguém pega
+um `versao.json` apontando para um arquivo que ainda está copiando. Versões
+antigas podem ficar na pasta; não apague a que está no `versao.json`.
+
+**Instalar na máquina do usuário** (uma vez): abrir a pasta de rede e dar
+duplo clique em `Instalar_Aterramento.bat`. Ele copia o app para
+`%LOCALAPPDATA%\NordConsult\Aterramento`, anota o caminho da pasta de rede e
+cria o atalho na Área de Trabalho. Daí em diante o usuário só usa o atalho.
+
+**Como a atualização acontece:** ao abrir, o app lê o `versao.json` da pasta de
+rede; havendo versão maior que a sua, copia o `.exe`, confere o **SHA-256**,
+mostra "Atualizando…" e reabre já na versão nova. A versão em uso aparece no
+título da janela.
+
+Se a rede estiver fora, o `versao.json` ausente ou a cópia falhar, o app
+**abre normalmente na versão atual** e o motivo fica registrado em
+`%LOCALAPPDATA%\NordConsult\Aterramento\atualizacao.log`.
+
+A pasta de rede é descoberta, nesta ordem: variável de ambiente
+`ATERRAMENTO_ATUALIZACAO` → `atualizacao.txt` ao lado do `.exe` →
+`atualizacao.txt` na pasta local (gravado na instalação). Sem nenhum dos três,
+o app não checa atualização.
+
 > Para as Etapas 2–4 são necessários os **modelos** do cliente
 > (planilha resumo, laudo geral, laudo individual). Coloque-os em
 > `desktop/modelos/`.
