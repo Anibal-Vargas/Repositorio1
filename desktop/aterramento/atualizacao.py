@@ -5,9 +5,10 @@ Como funciona
 Na pasta compartilhada do servidor ficam dois arquivos, publicados a partir da
 Release gerada pelo GitHub Actions::
 
-    \\\\servidor\\NordConsult\\Aterramento\\
-        versao.json                     {"versao": "1.1.0", "arquivo": "...", "sha256": "..."}
-        RelatoriosAterramento_1.1.0.exe
+    V:\\Nord Consult\\Engenharia\\Documentos técnicos\\IA\\Softwares e
+       aplicativos\\Medição continuidade de aterramento\\Desktop\\
+        versao.json                     {"versao": "1.2.0", "arquivo": "...", "sha256": "..."}
+        RelatoriosAterramento_1.2.0.exe
 
 Cada usuário roda uma **cópia local** (``%LOCALAPPDATA%\\NordConsult\\Aterramento``),
 instalada pelo ``Instalar_Aterramento.bat`` que fica na mesma pasta de rede.
@@ -25,9 +26,10 @@ Onde o app procura a pasta de rede, nesta ordem:
 
 1. variável de ambiente ``ATERRAMENTO_ATUALIZACAO``;
 2. ``atualizacao.txt`` ao lado do executável;
-3. ``atualizacao.txt`` na pasta local do aplicativo (gravado na instalação).
+3. ``atualizacao.txt`` na pasta local do aplicativo (gravado na instalação);
+4. :data:`PASTA_REDE_PADRAO`, o caminho fixo da Nord, se estiver acessível.
 
-Nada disso configurado → o app simplesmente abre normalmente, sem checar
+Nenhuma delas disponível → o app simplesmente abre normalmente, sem checar
 atualização. Qualquer falha (rede fora, arquivo corrompido, sem permissão) é
 registrada em ``atualizacao.log`` e **nunca** impede o app de abrir.
 """
@@ -54,6 +56,15 @@ ARQUIVO_ORIGEM = "atualizacao.txt"
 ARQUIVO_INFO = "versao.json"
 VARIAVEL_AMBIENTE = "ATERRAMENTO_ATUALIZACAO"
 
+# Pasta de rede da Nord Consult. É o último recurso: se o atualizacao.txt não
+# existir (instalação manual, cópia do .exe passada por e-mail), o app ainda
+# encontra as atualizações. Mudou o servidor? Altere aqui, ou aponte a
+# variável de ambiente ATERRAMENTO_ATUALIZACAO.
+PASTA_REDE_PADRAO = (
+    r"V:\Nord Consult\Engenharia\Documentos técnicos\IA"
+    r"\Softwares e aplicativos\Medição continuidade de aterramento\Desktop"
+)
+
 
 # ---------------------------------------------------------------------------
 # Caminhos
@@ -77,16 +88,49 @@ def _pasta_do_executavel() -> str | None:
 
 
 def _ler_caminho(arquivo: str) -> str | None:
+    """Primeira linha útil de um atualizacao.txt.
+
+    O arquivo é gravado pelo ``Instalar_Aterramento.bat``, ou seja, no code
+    page do console do Windows — não em UTF-8. Como o caminho da pasta de rede
+    tem acentos ("Documentos técnicos", "Medição"), é preciso tentar mais de
+    uma codificação, senão a leitura falha justamente no caso real.
+    """
     try:
-        with open(arquivo, encoding="utf-8-sig") as f:
-            for linha in f:
-                linha = linha.strip()
-                # Permite comentários com "#" no atualizacao.txt.
-                if linha and not linha.startswith("#"):
-                    return linha
+        with open(arquivo, "rb") as f:
+            bruto = f.read()
     except OSError:
-        pass
-    return None
+        return None
+
+    # cp1252 e cp850 aceitam qualquer byte, então não dá para descobrir a
+    # codificação só tentando decodificar: as duas "dão certo" e uma delas
+    # devolve acentos trocados. O desempate é a própria pasta — vence o
+    # candidato que existe no disco.
+    candidatos: list[str] = []
+    for codificacao in ("utf-8-sig", "cp1252", "cp850", "mbcs"):
+        try:
+            texto = bruto.decode(codificacao)
+        except (UnicodeDecodeError, LookupError):
+            continue
+        for linha in texto.splitlines():
+            linha = linha.strip().strip('"')
+            # O instalador grava "%~dp0", que termina em barra; tira a barra
+            # final (menos em raízes como "V:\") para o teste de pasta valer.
+            if len(linha) > 3:
+                linha = linha.rstrip("\\/")
+            # Permite comentários com "#" no atualizacao.txt.
+            if linha and not linha.startswith("#"):
+                if linha not in candidatos:
+                    candidatos.append(linha)
+                break
+
+    for caminho in candidatos:
+        try:
+            if os.path.isdir(caminho):
+                return caminho
+        except OSError:
+            continue
+    # Nenhum existe (rede fora, por exemplo): devolve a leitura mais provável.
+    return candidatos[0] if candidatos else None
 
 
 def pasta_origem() -> str | None:
@@ -105,6 +149,10 @@ def pasta_origem() -> str | None:
         caminho = _ler_caminho(arquivo)
         if caminho:
             return caminho
+
+    # Nada configurado: cai na pasta padrão da Nord, se ela estiver acessível.
+    if PASTA_REDE_PADRAO and os.path.isdir(PASTA_REDE_PADRAO):
+        return PASTA_REDE_PADRAO
     return None
 
 

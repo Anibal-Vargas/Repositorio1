@@ -52,7 +52,19 @@ if errorlevel 1 (
 )
 
 REM --- Anota a pasta de rede (usada pela auto-atualizacao) ------------------
-> "%DESTINO%\atualizacao.txt" echo %ORIGEM%
+REM  O caminho tem acentos ("Documentos tecnicos", "Medicao"). Um "echo"
+REM  gravaria no code page do console (cp850), que depois e ambiguo na
+REM  leitura - por isso a gravacao vai pelo PowerShell, em UTF-8. Se o
+REM  PowerShell nao estiver disponivel, cai no echo mesmo (o aplicativo
+REM  tambem sabe ler cp850/cp1252).
+set "ATERRAMENTO_ORIGEM=%ORIGEM%"
+set "DESTINO_TXT=%DESTINO%\atualizacao.txt"
+del "%DESTINO_TXT%" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "[IO.File]::WriteAllText($env:DESTINO_TXT, $env:ATERRAMENTO_ORIGEM, (New-Object Text.UTF8Encoding $false))" 2>nul
+if not exist "%DESTINO%\atualizacao.txt" (
+  > "%DESTINO%\atualizacao.txt" echo %ORIGEM%
+)
 
 REM --- Atalho na Area de Trabalho ------------------------------------------
 set "VBS=%TEMP%\atalho_aterramento.vbs"

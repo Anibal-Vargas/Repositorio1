@@ -170,19 +170,29 @@ partir de uma pasta compartilhada. Rodar direto da rede foi descartado: o
 Windows trava o `.exe` em uso, impedindo publicar versão nova durante o
 expediente, e a abertura fica lenta.
 
-**Conteúdo da pasta de rede** (ex.: `\\servidor\NordConsult\Aterramento`):
+**Pasta de rede** (definida em `PASTA_REDE_PADRAO`, em `atualizacao.py`):
 
 ```
-versao.json                       ← versão "ligada" no momento
-RelatoriosAterramento_1.1.0.exe
-Instalar_Aterramento.bat
+V:\Nord Consult\Engenharia\Documentos técnicos\IA\Softwares e aplicativos\
+   Medição continuidade de aterramento\Desktop\
+       versao.json                       ← versão "ligada" no momento
+       RelatoriosAterramento_1.2.0.exe
+       Instalar_Aterramento.bat
 ```
 
 **Publicar uma versão nova** (quem administra o servidor, uma vez por versão):
 
 1. em **Code → Releases**, baixe para uma mesma pasta os anexos
    `RelatoriosAterramento_<versão>.exe`, `versao.json` e `publicar.bat`;
-2. rode `publicar.bat \\servidor\NordConsult\Aterramento`.
+2. duplo clique em `publicar.bat` — ele já aponta para a pasta acima. Para
+   outra pasta: `publicar.bat "D:\outro caminho"` (entre aspas).
+
+O caminho tem acentos, e arquivos `.bat` são lidos no code page do console —
+por isso o `publicar.bat` localiza a pasta com coringas (`Documentos
+t?cnicos`) em vez de escrever os acentos, e o `Instalar_Aterramento.bat`
+grava o `atualizacao.txt` em UTF-8 via PowerShell. O app, por sua vez, lê esse
+arquivo em UTF-8, cp1252 ou cp850, usando a existência da pasta como
+desempate.
 
 O `.exe` é copiado primeiro e o `versao.json` por último — assim ninguém pega
 um `versao.json` apontando para um arquivo que ainda está copiando. Versões
@@ -202,10 +212,11 @@ Se a rede estiver fora, o `versao.json` ausente ou a cópia falhar, o app
 **abre normalmente na versão atual** e o motivo fica registrado em
 `%LOCALAPPDATA%\NordConsult\Aterramento\atualizacao.log`.
 
-A pasta de rede é descoberta, nesta ordem: variável de ambiente
+A pasta de rede é descoberta nesta ordem: variável de ambiente
 `ATERRAMENTO_ATUALIZACAO` → `atualizacao.txt` ao lado do `.exe` →
-`atualizacao.txt` na pasta local (gravado na instalação). Sem nenhum dos três,
-o app não checa atualização.
+`atualizacao.txt` na pasta local (gravado na instalação) → o caminho fixo em
+`PASTA_REDE_PADRAO`, se estiver acessível. Nenhum deles disponível: o app não
+checa atualização e abre normalmente.
 
 > Para as Etapas 2–4 são necessários os **modelos** do cliente
 > (planilha resumo, laudo geral, laudo individual). Coloque-os em
