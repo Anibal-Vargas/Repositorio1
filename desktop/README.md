@@ -148,8 +148,19 @@ pendentes) e a lista de máquinas por setor, com as pendências.
   usa o **Word/Excel** (o `pywin32` já vem no `requirements.txt`) e, se não
   houver Office, o **LibreOffice**. Se nenhum dos dois existir, o app avisa
   antes de gerar e explica o que instalar.
-- **.exe**: dê duplo clique em `construir_exe.bat` dentro da pasta `desktop`
-  (requer Python instalado). Ao final, o executável fica em
+- **.exe (automático — recomendado)**: o workflow
+  `.github/workflows/build_desktop.yml` compila o executável numa máquina
+  Windows do GitHub a cada push que altere `desktop/`. Ao terminar, publica a
+  **Release** `desktop-v<VERSAO>` com dois anexos:
+  `RelatoriosAterramento_<VERSAO>.exe` e `versao.json` (versão, SHA-256 e
+  commit de origem). É só baixar o `.exe` em **Code → Releases**.
+  Também dá para rodar sob demanda em **Actions → "Executável do app desktop
+  (.exe)" → Run workflow**.
+- **Versão**: definida pela constante `VERSAO` em `aterramento/__init__.py`.
+  Altere-a ao publicar uma versão nova; repetir um build sem alterá-la
+  substitui a Release existente pelo executável mais recente.
+- **.exe (manual)**: dê duplo clique em `construir_exe.bat` dentro da pasta
+  `desktop` (requer Python instalado). Ao final, o executável fica em
   `dist\RelatoriosAterramento.exe` e roda sem precisar de Python.
 
 > Para as Etapas 2–4 são necessários os **modelos** do cliente

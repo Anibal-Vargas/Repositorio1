@@ -1,0 +1,134 @@
+name: Executável do app desktop (.exe)
+
+# Gera o RelatoriosAterramento.exe numa máquina Windows do GitHub e publica o
+# resultado como Release, para que ninguém precise compilar nada localmente.
+#
+# Dispara sozinho a cada push que mexa em desktop/ e também pode ser rodado
+# manualmente na aba "Actions" -> "Executável do app desktop (.exe)" -> "Run
+# workflow".
+on:
+  push:
+    branches:
+      - main
+      - master
+      - claude/desktop-aterramento-reports-a753x0
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build_desktop.yml"
+  workflow_dispatch:
+
+# Necessário para criar a Release e anexar o .exe.
+permissions:
+  contents: write
+
+# Um build por branch de cada vez; um push novo cancela o anterior.
+concurrency:
+  group: build-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  construir:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Ler a versão do aplicativo
+        id: versao
+        shell: pwsh
+        run: |
+          # A versão é a constante VERSAO em desktop/aterramento/__init__.py.
+          $v = (Select-String -Path aterramento\__init__.py -Pattern '^VERSAO\s*=\s*"(.+)"').Matches[0].Groups[1].Value
+          if (-not $v) { Write-Error "Não consegui ler VERSAO de aterramento/__init__.py"; exit 1 }
+          "versao=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Versão do app: $v"
+
+      - name: Gerar o executável
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name "RelatoriosAterramento"
+          --add-data "modelos;modelos"
+          --add-data "aterramento/logo-nord.png;aterramento"
+          --hidden-import PIL._tkinter_finder
+          --hidden-import win32com.client
+          --hidden-import pythoncom
+          --hidden-import win32timezone
+          iniciar_app.py
+
+      - name: Conferir o executável e preparar os arquivos da entrega
+        id: pacote
+        shell: pwsh
+        run: |
+          $exe = "dist\RelatoriosAterramento.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "O executável não foi gerado. Veja o log do PyInstaller acima."
+            exit 1
+          }
+          $v = "${{ steps.versao.outputs.versao }}"
+          $nome = "RelatoriosAterramento_$v.exe"
+          Copy-Item $exe "dist\$nome"
+
+          # versao.json: usado pela publicação na pasta de rede (auto-update).
+          $sha = (Get-FileHash "dist\$nome" -Algorithm SHA256).Hash.ToLower()
+          $info = [ordered]@{
+            versao  = $v
+            arquivo = $nome
+            sha256  = $sha
+            commit  = "${{ github.sha }}"
+            geradoEm = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          }
+          $info | ConvertTo-Json | Set-Content -Encoding utf8 "dist\versao.json"
+
+          "nome=$nome" >> $env:GITHUB_OUTPUT
+          $tamanho = [math]::Round((Get-Item "dist\$nome").Length / 1MB, 1)
+          Write-Host "Gerado: $nome ($tamanho MB)"
+
+      - name: Guardar o executável como artefato do build
+        uses: actions/upload-artifact@v4
+        with:
+          name: RelatoriosAterramento-${{ steps.versao.outputs.versao }}
+          path: |
+            desktop/dist/RelatoriosAterramento_*.exe
+            desktop/dist/versao.json
+          retention-days: 90
+
+      - name: Publicar a Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "desktop-v${{ steps.versao.outputs.versao }}"
+          $nome = "${{ steps.pacote.outputs.nome }}"
+
+          # Uma Release por versão: se a tag já existir, ela é substituída pelo
+          # build mais recente (evita erro ao repetir um push sem mudar VERSAO).
+          # O "gh release view" devolve erro quando a Release não existe, o que
+          # é o caso normal na primeira vez - por isso o exit code é ignorado.
+          $PSNativeCommandUseErrorActionPreference = $false
+          gh release view $tag > $null 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag já existe - substituindo pelo build atual."
+            gh release delete $tag --yes --cleanup-tag
+          }
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          gh release create $tag "dist/$nome" "dist/versao.json" `
+            --title "App desktop $tag" `
+            --notes "Executável gerado automaticamente a partir do commit ${{ github.sha }}.`n`nBaixe o **$nome** e rode no Windows - não precisa instalar Python." `
+            --target "${{ github.sha }}"
+          Write-Host "Release publicada: $tag"

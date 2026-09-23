@@ -17,4 +17,7 @@ __all__ = [
     "Pacote",
 ]
 
-VERSAO = "0.1.0"
+# Versão do aplicativo. É ela que nomeia o executável e a Release gerados
+# automaticamente pelo workflow .github/workflows/build_desktop.yml — altere
+# aqui antes de publicar uma versão nova.
+VERSAO = "1.0.0"
