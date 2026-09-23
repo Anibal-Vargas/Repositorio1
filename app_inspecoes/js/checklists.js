@@ -22,6 +22,8 @@ export const CHECKLISTS = {
     rotulo: 'Subestações',
     // Checklist oficial Nord Consult (planilha 'Checklist inspeção de
     // subestações', aba P1 - V&F), importado em 2026-07-16.
+    // sub-053 (infiltração) e sub-054 (intertravamento das seccionadoras)
+    // incluídos em 2026-09-23 a pedido da Nord Consult.
     secoes: [
       {
         titulo: 'Geral',
@@ -40,6 +42,7 @@ export const CHECKLISTS = {
           { id: 'sub-012', texto: 'Iluminação é adequada e funciona?' },
           { id: 'sub-013', texto: 'Lacres de dispositivos de medição e selos de concessionária, quando aplicável, estão intactos?' },
           { id: 'sub-014', texto: 'O ambiente está limpo, sem acúmulo de poeira condutiva, óleo, resíduos ou materiais estranhos?' },
+          { id: 'sub-053', texto: 'NÃO há sinais de infiltração de água no interior da subestação através do teto, paredes, portas ou janelas?' },
           { id: 'sub-015', texto: 'O ambiente não apresenta materiais depositados em seu interior?' },
           { id: 'sub-016', texto: 'Sistema de ventilação da subestação funciona?' },
           { id: 'sub-017', texto: 'Todos os painéis estão com a sua carcaça aterrada?' },
@@ -106,6 +109,7 @@ export const CHECKLISTS = {
       {
         titulo: 'Geral (demais itens)',
         itens: [
+          { id: 'sub-054', texto: 'Existe intertravamento elétrico (através de chave fim de curso) nas chaves seccionadoras com algum disjuntor geral de baixa ou média tensão?' },
           { id: 'sub-041', texto: 'No caso de ramal de saída subterrâneo a malha de aterramento do cabo está conectada à terra em uma das extremidades do cabo?' },
           { id: 'sub-042', texto: 'Tela de proteção interna possui malha nas dimensões adequadas? (máx 30x30mm)' },
           { id: 'sub-043', texto: 'Ausência de furos nas telas internas, externas, em anteparos, portas ou janelas?' },
