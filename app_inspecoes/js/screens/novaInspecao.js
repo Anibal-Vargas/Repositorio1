@@ -1,4 +1,5 @@
-// Nova inspeção — tela única: inspetor (lista suspensa), cliente e tipo.
+// Nova inspeção — tela única: inspetor (lista suspensa), cliente e tipo,
+// liberados em sequência (cada etapa só abre depois da anterior).
 // O inspetor escolhido fica salvo e vem pré-selecionado na próxima vez.
 
 import {
@@ -155,40 +156,90 @@ export async function telaNovaInspecao() {
     document.getElementById('app').replaceChildren(...tela);
   }
 
+  // ---- Etapas em sequência: inspetor → cliente → tipo ----
+  // Cada etapa só é liberada depois que a anterior foi preenchida; as
+  // bloqueadas ficam em cinza e com os campos desativados.
+  const botoesTipo = TIPOS.map((tipo) => el('button', {
+    class: 'cartao',
+    disabled: !tipo.ativo,
+    onclick: () => iniciar(tipo.codigo),
+  },
+    el('span', { 'aria-hidden': 'true', style: 'font-size:1.4rem' }, tipo.icone),
+    el('span', { class: 'principal' },
+      el('span', { class: 'titulo' }, tipo.rotulo),
+      el('span', { class: 'detalhe' }, tipo.ativo ? 'Toque para iniciar' : 'Aguardando checklist'),
+    ),
+    tipo.ativo ? el('span', { class: 'seta', 'aria-hidden': 'true' }, '›') : null,
+  ));
+
+  const dicaCliente = el('p', { class: 'dica-etapa' }, '🔒 Selecione primeiro o inspetor.');
+  const dicaTipo = el('p', { class: 'dica-etapa' }, '🔒 Selecione primeiro o cliente.');
+
+  const etapaInspetor = el('section', { class: 'etapa' },
+    el('h2', {}, '1. Inspetor'),
+    el('div', {},
+      el('label', { for: 'inspetor' }, 'Quem está inspecionando?'),
+      seletorInspetor,
+    ),
+    campoInspetorOutro,
+  );
+  const etapaCliente = el('section', { class: 'etapa' },
+    el('h2', {}, '2. Cliente'),
+    dicaCliente,
+    el('div', {},
+      el('label', { for: 'cliente' }, 'Para qual cliente?'),
+      seletorCliente,
+    ),
+    campoClienteNovo,
+  );
+  const etapaTipo = el('section', { class: 'etapa' },
+    el('h2', {}, '3. Tipo de inspeção'),
+    dicaTipo,
+    el('div', { class: 'lista' }, botoesTipo),
+  );
+
+  const inspetorPreenchido = () => {
+    const valor = seletorInspetor.value;
+    if (!valor) return false;
+    return valor !== OUTRO || campoInspetorOutro.value.trim() !== '';
+  };
+  const clientePreenchido = () => {
+    const valor = seletorCliente.value;
+    if (!valor) return false;
+    return valor !== NOVO_CLIENTE || campoClienteNovo.value.trim() !== '';
+  };
+
+  function atualizarEtapas() {
+    const liberaCliente = inspetorPreenchido();
+    const liberaTipo = liberaCliente && clientePreenchido();
+
+    etapaCliente.classList.toggle('bloqueada', !liberaCliente);
+    seletorCliente.disabled = !liberaCliente;
+    campoClienteNovo.disabled = !liberaCliente;
+    dicaCliente.hidden = liberaCliente;
+
+    etapaTipo.classList.toggle('bloqueada', !liberaTipo);
+    TIPOS.forEach((tipo, i) => {
+      botoesTipo[i].disabled = !tipo.ativo || !liberaTipo;
+      if (tipo.ativo) {
+        botoesTipo[i].querySelector('.detalhe').textContent =
+          liberaTipo ? 'Toque para iniciar' : 'Bloqueado';
+      }
+    });
+    dicaTipo.hidden = liberaTipo;
+    dicaTipo.textContent = liberaCliente
+      ? '🔒 Selecione primeiro o cliente.'
+      : '🔒 Selecione primeiro o inspetor e o cliente.';
+  }
+
+  seletorInspetor.addEventListener('change', atualizarEtapas);
+  campoInspetorOutro.addEventListener('input', atualizarEtapas);
+  seletorCliente.addEventListener('change', atualizarEtapas);
+  campoClienteNovo.addEventListener('input', atualizarEtapas);
+  atualizarEtapas();
+
   return [
     cabecalho('Nova inspeção', '#/home'),
-    el('main', { class: 'conteudo' },
-      el('h2', {}, 'Inspetor'),
-      el('div', {},
-        el('label', { for: 'inspetor' }, 'Quem está inspecionando?'),
-        seletorInspetor,
-      ),
-      campoInspetorOutro,
-
-      el('h2', {}, 'Cliente'),
-      el('div', {},
-        el('label', { for: 'cliente' }, 'Para qual cliente?'),
-        seletorCliente,
-      ),
-      campoClienteNovo,
-
-      el('h2', {}, 'Tipo de inspeção'),
-      el('div', { class: 'lista' },
-        TIPOS.map((tipo) => el('button', {
-          class: 'cartao',
-          disabled: !tipo.ativo,
-          onclick: () => iniciar(tipo.codigo),
-        },
-          el('span', { 'aria-hidden': 'true', style: 'font-size:1.4rem' }, tipo.icone),
-          el('span', { class: 'principal' },
-            el('span', { class: 'titulo' }, tipo.rotulo),
-            tipo.ativo
-              ? el('span', { class: 'detalhe' }, 'Toque para iniciar')
-              : el('span', { class: 'detalhe' }, 'Aguardando checklist'),
-          ),
-          tipo.ativo ? el('span', { class: 'seta', 'aria-hidden': 'true' }, '›') : null,
-        )),
-      ),
-    ),
+    el('main', { class: 'conteudo' }, etapaInspetor, etapaCliente, etapaTipo),
   ];
 }

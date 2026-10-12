@@ -312,6 +312,30 @@ textarea { resize: vertical; min-height: 100px; }
   font-size: 0.9rem;
 }
 
+/* ---------- Etapas da Nova inspeção (liberadas em sequência) ---------- */
+.etapa { display: flex; flex-direction: column; gap: 0.8rem; }
+.etapa + .etapa { margin-top: 0.4rem; }
+.etapa.bloqueada { opacity: 0.5; filter: grayscale(1); }
+.etapa.bloqueada label { color: var(--cinza); }
+.dica-etapa { margin: -0.4rem 0 0; font-size: 0.85rem; color: var(--cinza); }
+[hidden] { display: none !important; }
+
+/* Campos e cartões desativados ficam em cinza */
+select:disabled, input:disabled, textarea:disabled {
+  background: #eceef1;
+  color: #9aa2ad;
+  border-color: #eceef1;
+  cursor: not-allowed;
+}
+.cartao:disabled {
+  background: #eceef1;
+  color: #9aa2ad;
+  border-color: #eceef1;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.cartao:disabled .detalhe, .cartao:disabled .seta { color: #9aa2ad; }
+
 /* ---------- Grade de fotos ---------- */
 .grade-fotos {
   display: grid;
