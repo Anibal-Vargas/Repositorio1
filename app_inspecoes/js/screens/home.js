@@ -1,4 +1,4 @@
-// Home — Nova inspeção / Retomar / Exportar + espaço usado no rodapé.
+// Home — Nova Inspeção? / Retomar inspeção? / Finalizar e exportar? + espaço usado no rodapé.
 
 import { obterInspetor, listarInspecoesAbertas } from '../db.js';
 import { solicitarPersistencia, textoEspacoUsado } from '../storage.js';
@@ -47,7 +47,7 @@ export async function telaHome() {
       el('button', {
         class: 'btn btn-secundario btn-grande',
         onclick: () => { location.hash = '#/exportar'; },
-      }, el('span', { class: 'icone' }, '📦'), 'Exportar'),
+      }, el('span', { class: 'icone' }, '📦'), 'Finalizar e exportar?'),
 
       rodape,
     ),
