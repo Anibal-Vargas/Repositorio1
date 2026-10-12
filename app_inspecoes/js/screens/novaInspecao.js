@@ -5,7 +5,7 @@
 import {
   listarClientes, criarCliente, criarInspecao, obterInspetor, salvarInspetor,
 } from '../db.js';
-import { el, cabecalho, toast, botaoVoltar } from '../ui.js';
+import { el, cabecalho, toast } from '../ui.js';
 import { tipoTemChecklist } from '../checklists.js';
 
 const INSPETORES = [
@@ -124,14 +124,8 @@ export async function telaNovaInspecao() {
     const voltar = () => telaNovaInspecao().then((novo) => {
       document.getElementById('app').replaceChildren(...(Array.isArray(novo) ? novo : [novo]));
     });
-    const h1 = el('h1', {}, 'Inspeção de painéis',
-      el('span', { class: 'subtitulo' }, 'Como deseja registrar?'));
-    const cabecalhoModo = el('header', { class: 'cabecalho' },
-      botaoVoltar(voltar),
-      h1,
-    );
     const tela = [
-      cabecalhoModo,
+      cabecalho('Inspeção de painéis', voltar, 'Como deseja registrar?'),
       el('main', { class: 'conteudo' },
         el('div', { class: 'lista' },
           el('button', { class: 'cartao', onclick: () => criar('checklist') },

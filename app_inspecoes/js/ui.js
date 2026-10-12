@@ -30,14 +30,21 @@ export function botaoVoltar(aoTocar) {
     el('span', { class: 'seta-voltar', 'aria-hidden': 'true' }, '←'), 'Voltar');
 }
 
-/** Cabeçalho fixo com botão voltar opcional. */
-export function cabecalho(titulo, voltarHash = null, subtitulo = null) {
+/**
+ * Cabeçalho fixo (só o título) + botão "← Voltar" no corpo da tela, logo
+ * abaixo do cabeçalho. voltar: hash de destino ('#/home') ou função.
+ * Devolve um fragmento: quem o insere recebe os dois elementos.
+ */
+export function cabecalho(titulo, voltar = null, subtitulo = null) {
   const h1 = el('h1', {}, titulo);
   if (subtitulo) h1.append(el('span', { class: 'subtitulo' }, subtitulo));
-  return el('header', { class: 'cabecalho' },
-    voltarHash ? botaoVoltar(() => { location.hash = voltarHash; }) : null,
-    h1,
-  );
+  const fragmento = document.createDocumentFragment();
+  fragmento.append(el('header', { class: 'cabecalho' }, h1));
+  if (voltar) {
+    const aoTocar = typeof voltar === 'function' ? voltar : () => { location.hash = voltar; };
+    fragmento.append(el('div', { class: 'barra-voltar' }, botaoVoltar(aoTocar)));
+  }
+  return fragmento;
 }
 
 /** Cartão de lista com o botão "⋮" (mais opções) ao lado. */

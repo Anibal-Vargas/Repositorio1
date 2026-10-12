@@ -117,6 +117,10 @@ body::before {
 .btn-voltar .seta-voltar { font-size: 1.2rem; line-height: 1; }
 .btn-voltar:active { background: var(--laranja-suave); }
 
+/* Botão Voltar no corpo da tela, logo abaixo do cabeçalho */
+.barra-voltar { padding: 0.75rem 1rem 0; }
+.barra-voltar + .conteudo { padding-top: 0.75rem; }
+
 /* ---------- Conteúdo ---------- */
 .conteudo {
   flex: 1;

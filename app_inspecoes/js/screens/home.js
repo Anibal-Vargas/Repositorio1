@@ -31,7 +31,7 @@ export async function telaHome() {
       el('button', {
         class: 'btn btn-destaque btn-grande',
         onclick: () => { location.hash = '#/nova'; },
-      }, el('span', { class: 'icone' }, '📋'), 'Nova inspeção'),
+      }, el('span', { class: 'icone' }, '📋'), 'Nova Inspeção?'),
 
       el('button', {
         class: 'btn btn-primario btn-grande',
@@ -40,8 +40,8 @@ export async function telaHome() {
       },
         el('span', { class: 'icone' }, '▶️'),
         abertas.length > 0
-          ? `Retomar inspeção (${abertas.length} aberta${abertas.length > 1 ? 's' : ''})`
-          : 'Retomar inspeção',
+          ? `Retomar inspeção? (${abertas.length} aberta${abertas.length > 1 ? 's' : ''})`
+          : 'Retomar inspeção?',
       ),
 
       el('button', {
