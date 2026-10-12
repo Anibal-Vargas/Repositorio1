@@ -3,14 +3,16 @@
 // e salva a foto comprimida — no máximo 3 toques até a foto tirada.
 
 import {
-  db, obterInspecao, obterArea, listarAreas, criarArea,
-  listarNCsDaArea, criarNC, adicionarFoto, contarFotos,
+  db, obterInspecao, obterArea, listarAreas, criarArea, excluirArea, resumoExclusaoArea,
+  listarNCsDaArea, criarNC, excluirNC, adicionarFoto, contarFotos,
   listarPaineis, criarPainel, obterRespostas, listarItensExtras,
 } from '../db.js';
 import { totalItens } from '../checklists.js';
 import { capturarFoto } from '../camera.js';
 import { telaChecklist } from './checklist.js';
-import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
+import { el, cabecalho, toast, formatarDataHora, linhaComMenu, menuAcoes } from '../ui.js';
+
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
 const ROTULO_TIPO = {
   geral: 'Geral',
@@ -86,7 +88,7 @@ export async function telaInspecao(inspecaoId, areaId = null) {
       conteudo.append(el('div', { class: 'lista' },
         filhas.map((filha) => {
           const totalNCs = contagens.get(filha.id) || 0;
-          return el('button', {
+          const cartao = el('button', {
             class: 'cartao',
             onclick: () => { location.hash = `#/inspecao/${inspecaoId}/area/${filha.id}`; },
           },
@@ -95,6 +97,11 @@ export async function telaInspecao(inspecaoId, areaId = null) {
             totalNCs > 0 ? el('span', { class: 'selo selo-nc' }, `${totalNCs} NC`) : null,
             el('span', { class: 'seta', 'aria-hidden': 'true' }, '›'),
           );
+          return linhaComMenu(cartao, `Opções de ${filha.nome}`, () => menuAcoes(filha.nome, [{
+            rotulo: `🗑️ Excluir ${filhaSingular.toLowerCase()}`,
+            perigo: true,
+            aoTocar: () => confirmarExclusaoArea(filha, filhaSingular),
+          }]));
         }),
       ));
     } else {
@@ -110,9 +117,10 @@ export async function telaInspecao(inspecaoId, areaId = null) {
     const adicionar = async () => {
       const nome = campoArea.value.trim();
       if (!nome) { campoArea.focus(); return; }
-      await criarArea(inspecaoId, nome, areaId);
+      const novaId = await criarArea(inspecaoId, nome, areaId);
       toast(`${filhaSingular} "${nome}" ${area && ehPaineisFotos ? 'criado' : 'criada'}.`);
-      recarregar();
+      // Abre direto a área/sub-área criada para já registrar o conteúdo dela.
+      location.hash = `#/inspecao/${inspecaoId}/area/${novaId}`;
     };
     campoArea.addEventListener('keydown', (evento) => { if (evento.key === 'Enter') adicionar(); });
     conteudo.append(el('div', { class: 'linha-form' },
@@ -181,7 +189,7 @@ export async function telaInspecao(inspecaoId, areaId = null) {
     if (ncs.length) {
       const cartoes = await Promise.all(ncs.map(async (nc) => {
         const fotos = await contarFotos(nc.id);
-        return el('button', {
+        const cartao = el('button', {
           class: 'cartao',
           onclick: () => { location.hash = `#/nc/${nc.id}`; },
         },
@@ -192,6 +200,16 @@ export async function telaInspecao(inspecaoId, areaId = null) {
           ),
           el('span', { class: 'seta', 'aria-hidden': 'true' }, '›'),
         );
+        return linhaComMenu(cartao, `Opções da ${nc.numero}`, () => menuAcoes(nc.numero, [{
+          rotulo: '🗑️ Excluir não conformidade',
+          perigo: true,
+          aoTocar: async () => {
+            if (!confirm(`Excluir a ${nc.numero} com ${plural(fotos, 'foto', 'fotos')}, áudios e descrição? Esta ação não pode ser desfeita.`)) return;
+            await excluirNC(nc.id);
+            toast(`${nc.numero} excluída.`);
+            recarregar();
+          },
+        }]));
       }));
       conteudo.append(el('div', { class: 'lista' }, cartoes));
     } else {
@@ -232,6 +250,25 @@ export async function telaInspecao(inspecaoId, areaId = null) {
       const app = document.getElementById('app');
       app.replaceChildren(...(Array.isArray(novo) ? novo : [novo]));
     });
+  }
+
+  // Excluir área/sub-área/painel: avisa tudo o que vai junto antes de apagar.
+  async function confirmarExclusaoArea(alvo, rotulo) {
+    const r = await resumoExclusaoArea(alvo.id);
+    if (!r) return;
+    const junto = [
+      r.subareas && plural(r.subareas, 'sub-área', 'sub-áreas'),
+      r.paineis && plural(r.paineis, 'painel (com checklist)', 'painéis (com checklists)'),
+      r.ncs && plural(r.ncs, 'não conformidade', 'não conformidades'),
+      r.fotos && plural(r.fotos, 'foto', 'fotos'),
+    ].filter(Boolean);
+    const aviso = junto.length
+      ? `\n\nSerão apagados junto: ${junto.join(', ')}, além de áudios e descrições.`
+      : '';
+    if (!confirm(`Excluir ${rotulo.toLowerCase()} "${alvo.nome}"?${aviso}\n\nEsta ação não pode ser desfeita.`)) return;
+    await excluirArea(alvo.id);
+    toast(`${rotulo} "${alvo.nome}" excluíd${rotulo === 'Painel' ? 'o' : 'a'}.`);
+    recarregar();
   }
 
   return [cabecalho(titulo, voltarPara, subtitulo), conteudo];

@@ -24,20 +24,56 @@ export function el(tag, atributos = {}, ...filhos) {
   return elemento;
 }
 
+/** Botão "← Voltar" do cabeçalho (retorna à etapa anterior). */
+export function botaoVoltar(aoTocar) {
+  return el('button', { class: 'btn-voltar', onclick: aoTocar },
+    el('span', { class: 'seta-voltar', 'aria-hidden': 'true' }, '←'), 'Voltar');
+}
+
 /** Cabeçalho fixo com botão voltar opcional. */
 export function cabecalho(titulo, voltarHash = null, subtitulo = null) {
   const h1 = el('h1', {}, titulo);
   if (subtitulo) h1.append(el('span', { class: 'subtitulo' }, subtitulo));
   return el('header', { class: 'cabecalho' },
-    voltarHash
-      ? el('button', {
-          class: 'btn-voltar',
-          'aria-label': 'Voltar',
-          onclick: () => { location.hash = voltarHash; },
-        }, '←')
-      : null,
+    voltarHash ? botaoVoltar(() => { location.hash = voltarHash; }) : null,
     h1,
   );
+}
+
+/** Cartão de lista com o botão "⋮" (mais opções) ao lado. */
+export function linhaComMenu(cartao, rotuloMenu, aoAbrirMenu) {
+  return el('div', { class: 'linha-cartao' },
+    cartao,
+    el('button', { class: 'btn-mais', 'aria-label': rotuloMenu, onclick: aoAbrirMenu }, '⋮'),
+  );
+}
+
+/**
+ * Menu de ações em folha inferior (aberto pelo "⋮").
+ * acoes: [{ rotulo, perigo?, aoTocar }]
+ */
+export function menuAcoes(titulo, acoes) {
+  const fechar = () => {
+    fundo.remove();
+    document.removeEventListener('keydown', aoTeclar);
+    window.removeEventListener('hashchange', fechar);
+  };
+  const aoTeclar = (evento) => { if (evento.key === 'Escape') fechar(); };
+  const folha = el('div', { class: 'folha-acoes', role: 'dialog', 'aria-modal': 'true', 'aria-label': titulo },
+    el('p', { class: 'folha-titulo' }, titulo),
+    acoes.map((acao) => el('button', {
+      class: `btn ${acao.perigo ? 'btn-perigo' : 'btn-secundario'}`,
+      onclick: () => { fechar(); acao.aoTocar(); },
+    }, acao.rotulo)),
+    el('button', { class: 'btn btn-discreto', onclick: fechar }, 'Cancelar'),
+  );
+  const fundo = el('div', {
+    class: 'fundo-folha',
+    onclick: (evento) => { if (evento.target === fundo) fechar(); },
+  }, folha);
+  document.addEventListener('keydown', aoTeclar);
+  window.addEventListener('hashchange', fechar);
+  document.body.append(fundo);
 }
 
 let temporizadorToast = null;

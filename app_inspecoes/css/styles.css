@@ -98,16 +98,23 @@ body::before {
 }
 
 .btn-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   min-width: 44px;
   min-height: 44px;
-  border: none;
-  background: transparent;
+  padding: 0 0.7rem 0 0.55rem;
+  border: 1.5px solid var(--laranja);
+  background: var(--branco);
   color: var(--laranja-forte);
-  font-size: 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   border-radius: var(--raio);
   cursor: pointer;
   flex-shrink: 0;
+  touch-action: manipulation;
 }
+.btn-voltar .seta-voltar { font-size: 1.2rem; line-height: 1; }
 .btn-voltar:active { background: var(--laranja-suave); }
 
 /* ---------- Conteúdo ---------- */
@@ -237,6 +244,55 @@ textarea { resize: vertical; min-height: 100px; }
 .cartao .detalhe { display: block; font-size: 0.8rem; color: var(--cinza); margin-top: 1px; }
 .cartao .principal { flex: 1; min-width: 0; }
 .cartao .seta { color: var(--laranja); font-size: 1.2rem; flex-shrink: 0; }
+
+/* Cartão com botão "⋮" (mais opções) ao lado */
+.linha-cartao { display: flex; gap: 0.4rem; align-items: stretch; }
+.linha-cartao .cartao { flex: 1; min-width: 0; }
+.btn-mais {
+  flex-shrink: 0;
+  min-width: 44px;
+  border: 1.5px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--branco);
+  color: var(--cinza);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--sombra);
+  touch-action: manipulation;
+}
+.btn-mais:active { border-color: var(--laranja); background: var(--laranja-suave); }
+
+/* Folha de ações (menu do "⋮") */
+.fundo-folha {
+  position: fixed;
+  inset: 0;
+  z-index: 110; /* acima do toast (100) */
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.folha-acoes {
+  width: 100%;
+  max-width: 680px;
+  background: var(--branco);
+  border-radius: 16px 16px 0 0;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.2);
+}
+.folha-titulo {
+  margin: 0 0 0.2rem;
+  font-weight: 600;
+  color: var(--grafite);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .selo {
   flex-shrink: 0;

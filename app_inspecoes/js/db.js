@@ -170,6 +170,55 @@ export async function listarAreas(inspecaoId, parentId = null) {
   return todas.filter((a) => (a.parentId ?? null) === parentId);
 }
 
+/** Tudo o que sai junto com a área: ela, as sub-áreas, os painéis e as NCs. */
+async function coletarArea(areaId) {
+  const area = await db.areas.get(areaId);
+  if (!area) return null;
+  const { inspecaoId } = area;
+  const filhas = await db.areas.where('inspecaoId').equals(inspecaoId)
+    .filter((a) => a.parentId === areaId).toArray();
+  const areaIds = [areaId, ...filhas.map((a) => a.id)];
+  const painelIds = (await db.paineis.where('inspecaoId').equals(inspecaoId)
+    .filter((p) => areaIds.includes(p.areaId)).toArray()).map((p) => p.id);
+  // NCs da área/sub-área e as de checklist dos painéis (estas têm areaId null).
+  const ncIds = (await db.ncs.where('inspecaoId').equals(inspecaoId)
+    .filter((nc) => areaIds.includes(nc.areaId) || painelIds.includes(nc.painelId))
+    .toArray()).map((nc) => nc.id);
+  const fotos = ncIds.length ? await db.fotos.where('ncId').anyOf(ncIds).count() : 0;
+  return { inspecaoId, areaIds, painelIds, ncIds, subareas: filhas.length, fotos };
+}
+
+/** Contagens para o aviso de confirmação antes de excluir a área. */
+export async function resumoExclusaoArea(areaId) {
+  const c = await coletarArea(areaId);
+  return c && {
+    subareas: c.subareas, paineis: c.painelIds.length, ncs: c.ncIds.length, fotos: c.fotos,
+  };
+}
+
+/** Exclui a área com sub-áreas, painéis (e checklists), NCs, fotos e áudios. */
+export async function excluirArea(areaId) {
+  const c = await coletarArea(areaId);
+  if (!c) return;
+  await db.transaction('rw',
+    db.areas, db.paineis, db.ncs, db.fotos, db.audios, db.respostas, db.itensExtras, async () => {
+      if (c.ncIds.length) {
+        await db.fotos.where('ncId').anyOf(c.ncIds).delete();
+        await db.audios.where('ncId').anyOf(c.ncIds).delete();
+        await db.ncs.bulkDelete(c.ncIds);
+      }
+      if (c.painelIds.length) {
+        await db.respostas.where('inspecaoId').equals(c.inspecaoId)
+          .filter((r) => c.painelIds.includes(r.painelId)).delete();
+        await db.itensExtras.where('inspecaoId').equals(c.inspecaoId)
+          .filter((e) => c.painelIds.includes(e.painelId)).delete();
+        await db.paineis.bulkDelete(c.painelIds);
+      }
+      await db.areas.bulkDelete(c.areaIds);
+    });
+  await tocarInspecao(c.inspecaoId);
+}
+
 // ---------- NCs ----------
 
 /**

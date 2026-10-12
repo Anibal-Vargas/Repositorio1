@@ -182,7 +182,7 @@ function abrirVisor(foto, aoMudar) {
           aoMudar();
         },
       }, '🗑️ Excluir'),
-      el('button', { class: 'btn btn-secundario', onclick: fechar }, 'Fechar'),
+      el('button', { class: 'btn btn-secundario', onclick: fechar }, '← Voltar'),
     ),
   );
   document.body.append(visor);

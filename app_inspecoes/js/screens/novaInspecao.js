@@ -4,7 +4,7 @@
 import {
   listarClientes, criarCliente, criarInspecao, obterInspetor, salvarInspetor,
 } from '../db.js';
-import { el, cabecalho, toast } from '../ui.js';
+import { el, cabecalho, toast, botaoVoltar } from '../ui.js';
 import { tipoTemChecklist } from '../checklists.js';
 
 const INSPETORES = [
@@ -126,7 +126,7 @@ export async function telaNovaInspecao() {
     const h1 = el('h1', {}, 'Inspeção de painéis',
       el('span', { class: 'subtitulo' }, 'Como deseja registrar?'));
     const cabecalhoModo = el('header', { class: 'cabecalho' },
-      el('button', { class: 'btn-voltar', 'aria-label': 'Voltar', onclick: voltar }, '←'),
+      botaoVoltar(voltar),
       h1,
     );
     const tela = [
