@@ -289,6 +289,12 @@ textarea { resize: vertical; min-height: 100px; }
   gap: 0.6rem;
   box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.2);
 }
+.folha-mensagem {
+  margin: 0 0 0.3rem;
+  font-size: 0.92rem;
+  color: var(--grafite);
+  white-space: pre-line;
+}
 .folha-titulo {
   margin: 0 0 0.2rem;
   font-weight: 600;

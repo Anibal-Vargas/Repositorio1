@@ -1,7 +1,7 @@
 // Service Worker — cache offline-first de todos os assets do app.
 // Para publicar uma atualização, incremente VERSAO: o SW novo instala,
 // assume imediatamente (skipWaiting) e a página recarrega sozinha.
-const VERSAO = 'v1.24.0';
+const VERSAO = 'v1.25.0';
 const CACHE = `inspecoes-${VERSAO}`;
 
 const ASSETS = [
@@ -10,10 +10,10 @@ const ASSETS = [
   './manifest.json',
   './css/styles.css',
   './vendor/dexie.min.js',
-  './vendor/jszip.min.js',
   './js/app.js',
   './js/db.js',
   './js/export.js',
+  './js/zipunico.js',
   './js/checklists.js',
   './js/ui.js',
   './js/versao.js',

@@ -5,8 +5,9 @@ import {
   db, listarInspecoesAbertas, listarInspecoesFinalizadas,
   progressoInspecao, finalizarInspecao, reabrirInspecao, excluirInspecao,
 } from '../db.js';
-import { gerarZips } from '../export.js';
-import { el, cabecalho, toast, formatarDataHora } from '../ui.js';
+import { gerarZip } from '../export.js';
+import { LADO_REDUZIDO } from '../camera.js';
+import { el, cabecalho, toast, formatarDataHora, menuAcoes } from '../ui.js';
 
 const ROTULO_TIPO = {
   geral: 'Geral',
@@ -101,45 +102,110 @@ async function cartaoInspecao(inspecao, conteudo) {
   );
 }
 
-async function exportar(inspecao, cliente, botao) {
+// Marca a exportação em andamento. Se o app fechar no meio (ex.: o aparelho
+// ficou sem memória), a marca sobra e a próxima tentativa dessa inspeção
+// oferece gerar com fotos reduzidas.
+const CHAVE_TENTATIVA = 'exportacaoEmAndamento';
+
+function lerTentativa() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_TENTATIVA)); } catch { return null; }
+}
+
+function marcarTentativa(valor) {
+  try {
+    if (valor) localStorage.setItem(CHAVE_TENTATIVA, JSON.stringify(valor));
+    else localStorage.removeItem(CHAVE_TENTATIVA);
+  } catch { /* sem armazenamento local: segue sem a marca */ }
+}
+
+/**
+ * Gera e entrega o .zip ÚNICO da inspeção. Se não for possível com as
+ * fotos originais, avisa e oferece gerar com as fotos reduzidas.
+ */
+async function exportar(inspecao, cliente, botao, reduzirFotos = false) {
+  if (!reduzirFotos) {
+    const anterior = lerTentativa();
+    if (anterior && anterior.inspecaoId === inspecao.id && !anterior.reduzirFotos) {
+      marcarTentativa(null);
+      oferecerReducao(inspecao, cliente, botao, 'interrompida');
+      return;
+    }
+  }
+
   const rotuloOriginal = botao.textContent;
   botao.disabled = true;
+  marcarTentativa({ inspecaoId: inspecao.id, reduzirFotos, inicio: Date.now() });
+  let pacote;
   try {
-    const { pacotes } = await gerarZips(inspecao.id, (parte, total, pct) => {
-      botao.textContent = total > 1
-        ? `Gerando parte ${parte}/${total}… ${Math.round(pct)}%`
-        : `Gerando… ${Math.round(pct)}%`;
+    pacote = await gerarZip(inspecao.id, {
+      reduzirFotos,
+      aoProgredir: (etapa, valor) => {
+        botao.textContent = etapa === 'reduzindo'
+          ? `Reduzindo fotos ${valor}…`
+          : `Gerando… ${Math.round(valor)}%`;
+      },
     });
-    const plural = pacotes.length > 1 ? `s (${pacotes.length} partes)` : '';
-
-    // Android: folha de compartilhamento (WhatsApp, Drive, e-mail…).
-    // Sem suporte (ou se falhar): download direto dos arquivos.
-    const arquivos = pacotes.map((p) => new File([p.blob], p.nomeArquivo, { type: 'application/zip' }));
-    if (navigator.canShare && navigator.canShare({ files: arquivos })) {
-      try {
-        await navigator.share({
-          files: arquivos,
-          title: `Inspeção NR-10 — ${cliente ? cliente.nome : ''}`,
-        });
-        toast(`Pacote${plural} compartilhado${pacotes.length > 1 ? 's' : ''}.`);
-        return;
-      } catch (erro) {
-        if (erro.name === 'AbortError') { toast('Compartilhamento cancelado.'); return; }
-        // NotAllowedError etc.: cai para o download.
-      }
-    }
-    for (const pacote of pacotes) {
-      baixar(pacote.blob, pacote.nomeArquivo);
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    toast(`Pacote${plural} salvo${pacotes.length > 1 ? 's' : ''} em Downloads.`);
   } catch (erro) {
     console.error(erro);
-    toast('Falha ao gerar o pacote. Tente novamente.');
+    if (reduzirFotos) {
+      toast('Não foi possível gerar o pacote, nem com as fotos reduzidas.', 4000);
+    } else {
+      oferecerReducao(inspecao, cliente, botao, 'falha');
+    }
+    return;
   } finally {
+    marcarTentativa(null);
     botao.disabled = false;
     botao.textContent = rotuloOriginal;
   }
+  await entregar(pacote, cliente, reduzirFotos);
+}
+
+/** Aviso com a opção de gerar o arquivo único com as fotos reduzidas. */
+function oferecerReducao(inspecao, cliente, botao, motivo) {
+  const explicacaoReducao =
+    `Posso gerar o arquivo único com as fotos reduzidas (lado maior ${LADO_REDUZIDO} px) ` +
+    'só nesta exportação. As fotos originais continuam guardadas no aparelho.';
+  const reduzir = {
+    rotulo: '📉 Gerar com fotos reduzidas',
+    principal: true,
+    aoTocar: () => exportar(inspecao, cliente, botao, true),
+  };
+  const tentarDeNovo = {
+    rotulo: 'Tentar de novo com fotos originais',
+    aoTocar: () => exportar(inspecao, cliente, botao, false),
+  };
+  if (motivo === 'interrompida') {
+    menuAcoes('A última exportação não terminou', [reduzir, tentarDeNovo],
+      'A tentativa anterior de exportar esta inspeção foi interrompida ' +
+      `(o app pode ter fechado por falta de memória).\n\n${explicacaoReducao}`);
+  } else {
+    menuAcoes('Não foi possível gerar o pacote', [reduzir, tentarDeNovo],
+      'O aparelho não conseguiu montar o arquivo com as fotos originais ' +
+      `(pode ter faltado memória).\n\n${explicacaoReducao}`);
+  }
+}
+
+async function entregar({ blob, nomeArquivo }, cliente, reduzirFotos) {
+  const sufixo = reduzirFotos ? ' (fotos reduzidas)' : '';
+  // Android: folha de compartilhamento (Drive, Arquivos, WhatsApp…).
+  // Sem suporte (ou se falhar): download direto para Downloads.
+  const arquivo = new File([blob], nomeArquivo, { type: 'application/zip' });
+  if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+    try {
+      await navigator.share({
+        files: [arquivo],
+        title: `Inspeção NR-10 — ${cliente ? cliente.nome : ''}`,
+      });
+      toast(`Pacote compartilhado${sufixo}.`);
+      return;
+    } catch (erro) {
+      if (erro.name === 'AbortError') { toast('Compartilhamento cancelado.'); return; }
+      // NotAllowedError, arquivo grande demais para compartilhar etc.: baixa.
+    }
+  }
+  baixar(blob, nomeArquivo);
+  toast(`Pacote salvo em Downloads${sufixo}.`);
 }
 
 function baixar(blob, nomeArquivo) {

@@ -39,6 +39,38 @@ export async function prepararFoto(arquivo) {
   return blob;
 }
 
+/** Lado maior das fotos quando a exportação usa fotos reduzidas. */
+export const LADO_REDUZIDO = 1920;
+
+/**
+ * Cópia reduzida de uma foto (lado maior LADO_REDUZIDO px, JPEG 0.85, já
+ * na orientação certa). Usada só na exportação com fotos reduzidas: a
+ * foto original guardada no aparelho não é alterada. Foto que já é menor
+ * que o limite volta como está.
+ */
+export async function reduzirFoto(blob) {
+  let imagem;
+  try {
+    imagem = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+  } catch {
+    imagem = await carregarViaImg(blob);
+  }
+  const escala = Math.min(1, LADO_REDUZIDO / Math.max(imagem.width, imagem.height));
+  if (escala === 1 && blob.type === 'image/jpeg') {
+    if (imagem.close) imagem.close();
+    return blob;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(imagem.width * escala);
+  canvas.height = Math.round(imagem.height * escala);
+  canvas.getContext('2d').drawImage(imagem, 0, 0, canvas.width, canvas.height);
+  if (imagem.close) imagem.close();
+  const reduzida = await new Promise((resolver) => canvas.toBlob(resolver, 'image/jpeg', 0.85));
+  canvas.width = canvas.height = 0; // libera a memória do canvas já
+  if (!reduzida) throw new Error('Falha ao reduzir a foto.');
+  return reduzida;
+}
+
 function carregarViaImg(arquivo) {
   return new Promise((resolver, rejeitar) => {
     const url = URL.createObjectURL(arquivo);

@@ -4,11 +4,13 @@
 //     NC-XXX_foto01.jpg…  NC-XXX_audio01.webm…  NC-XXX_desc01.txt
 // (a data é a do registro de cada NC; "AA-MM-DD" porque "/" não é
 // permitido em nome de pasta). Na raiz ficam ainda relatorio.html
-// (legível) e dados.json (estruturado).
-// JSZip é carregado como script global em index.html.
+// (legível) e dados.json (estruturado). Sempre um .zip único (ver
+// zipunico.js), qualquer que seja o tamanho.
 
 import { db } from './db.js';
 import { checklistDoTipo } from './checklists.js';
+import { reduzirFoto, LADO_REDUZIDO } from './camera.js';
+import { montarZip } from './zipunico.js';
 
 const ROTULO_TIPO = {
   geral: 'Geral',
@@ -410,7 +412,7 @@ function gerarRelatorioHTML(dados) {
 </header>
 ${tabelaChecklist(checklistResumo)}
 ${secoes || (checklistResumo ? '' : '<p class="vazio">Nenhuma área registrada.</p>')}
-<footer>Relatório gerado pelo app Inspeções de conformidade Técnica/NR-10 – Nord Consult em ${escapar(dataHora(Date.now()))}. Fotos, áudios e descrições estão na pasta <code>NCs/</code> deste pacote (data → área → sub-área → NC).</footer>
+<footer>Relatório gerado pelo app Inspeções de conformidade Técnica/NR-10 – Nord Consult em ${escapar(dataHora(Date.now()))}. Fotos, áudios e descrições estão na pasta <code>NCs/</code> deste pacote (data → área → sub-área → NC).${dados.fotosReduzidas ? ` As fotos deste pacote foram reduzidas para envio (lado maior ${LADO_REDUZIDO} px); os originais continuam no aparelho.` : ''}</footer>
 </body>
 </html>`;
 }
@@ -433,6 +435,9 @@ function gerarJSON(dados) {
   return JSON.stringify({
     app: 'Inspeções de conformidade Técnica/NR-10 – Nord Consult',
     exportadoEm: new Date().toISOString(),
+    // true quando as fotos foram reduzidas só nesta exportação (lado maior
+    // de LADO_REDUZIDO px); false = fotos originais da câmera.
+    fotosReduzidas: !!dados.fotosReduzidas,
     inspecao: {
       tipo: inspecao.tipo,
       rotuloTipo: ROTULO_TIPO[inspecao.tipo] || inspecao.tipo,
@@ -457,76 +462,52 @@ function gerarJSON(dados) {
 
 // ---------- pacote ZIP ----------
 
-/** Limite de tamanho por arquivo .zip exportado. */
-export const LIMITE_ZIP_BYTES = 500 * 1024 * 1024;
+function todasAsNCs(dados) {
+  return dados.arvore.flatMap((area) => [...area.ncs, ...area.subareas.flatMap((s) => s.ncs)]);
+}
 
 /**
- * Gera o(s) ZIP(s) da inspeção. Se o conteúdo passar do limite por
- * arquivo (500 MB), as NCs são divididas em partes — cada NC fica
- * inteira em uma única parte. relatorio.html e dados.json vão na parte 1
- * e referenciam o conjunto todo (extraia todas as partes na mesma pasta).
- * aoProgredir(parte, totalPartes, percentual) é opcional.
- * Retorna { pacotes: [{ blob, nomeArquivo }], dados }.
+ * Gera o .zip ÚNICO da inspeção — sempre um arquivo só, de qualquer
+ * tamanho (acima de 4 GB usa ZIP64). As fotos não são copiadas para a
+ * memória: o .zip referencia os arquivos já guardados no aparelho.
+ * opcoes:
+ *   reduzirFotos — true: fotos reduzidas (lado maior 1920 px) só nesta
+ *     exportação; os originais continuam no aparelho.
+ *   aoProgredir(etapa, valor) — etapa 'reduzindo' (valor = "12/300") ou
+ *     'gerando' (valor = percentual).
+ *   limite32 — só para testes do ZIP64.
+ * Retorna { blob, nomeArquivo, dados }.
  */
-export async function gerarZips(inspecaoId, aoProgredir, limiteBytes = LIMITE_ZIP_BYTES) {
+export async function gerarZip(inspecaoId, opcoes = {}) {
+  const { reduzirFotos = false, aoProgredir = null, limite32 } = opcoes;
   const dados = await coletarDados(inspecaoId);
+  dados.fotosReduzidas = reduzirFotos;
 
-  const todasNCs = [];
-  for (const area of dados.arvore) {
-    todasNCs.push(...area.ncs, ...area.subareas.flatMap((s) => s.ncs));
+  if (reduzirFotos) {
+    // Uma foto por vez: só uma imagem decodificada na memória.
+    const fotos = todasAsNCs(dados).flatMap((nc) => nc.fotos);
+    for (let i = 0; i < fotos.length; i++) {
+      if (aoProgredir) aoProgredir('reduzindo', `${i + 1}/${fotos.length}`);
+      fotos[i].blob = await reduzirFoto(fotos[i].blob);
+    }
   }
 
-  const tamanhoNC = (nc) =>
-    nc.fotos.reduce((soma, f) => soma + f.blob.size, 0) +
-    nc.audios.reduce((soma, a) => soma + a.blob.size, 0) +
-    (nc.descricao ? nc.descricao.length : 0) + 2048;
-
-  // Partição gulosa preservando a ordem das NCs.
-  const grupos = [[]];
-  let acumulado = 512 * 1024; // reserva para relatorio.html + dados.json na parte 1
-  for (const nc of todasNCs) {
-    const tamanho = tamanhoNC(nc);
-    if (grupos[grupos.length - 1].length && acumulado + tamanho > limiteBytes) {
-      grupos.push([]);
-      acumulado = 0;
-    }
-    grupos[grupos.length - 1].push(nc);
-    acumulado += tamanho;
+  const entradas = [
+    { nome: 'relatorio.html', conteudo: gerarRelatorioHTML(dados) },
+    { nome: 'dados.json', conteudo: gerarJSON(dados) },
+  ];
+  for (const nc of todasAsNCs(dados)) {
+    for (const foto of nc.fotos) entradas.push({ nome: foto.arquivo, conteudo: foto.blob });
+    for (const audio of nc.audios) entradas.push({ nome: audio.arquivo, conteudo: audio.blob });
+    if (nc.descricaoArquivo) entradas.push({ nome: nc.descricaoArquivo, conteudo: nc.descricao });
+    // NC sem nenhum anexo: registra a pasta vazia mesmo assim.
+    if (!nc.fotos.length && !nc.audios.length && !nc.descricaoArquivo) entradas.push({ nome: nc.pasta, conteudo: null });
   }
 
-  const totalPartes = grupos.length;
-  const nomeBase = `Inspecao_NR10_${sanitizarNomeArquivo(dados.cliente ? dados.cliente.nome : 'cliente')}_${new Date(dados.inspecao.criadoEm).toISOString().slice(0, 10)}`;
-  const pacotes = [];
-
-  for (let i = 0; i < totalPartes; i++) {
-    const zip = new JSZip();
-    if (i === 0) {
-      zip.file('relatorio.html', gerarRelatorioHTML(dados));
-      zip.file('dados.json', gerarJSON(dados));
-    }
-    if (totalPartes > 1) {
-      zip.file('LEIA-ME.txt',
-        `Parte ${i + 1} de ${totalPartes} da exportação "${nomeBase}".\n` +
-        'Extraia TODAS as partes na mesma pasta: os arquivos se completam.\n' +
-        'O relatorio.html e o dados.json estão na parte 1 e referenciam o conjunto todo.\n');
-    }
-    // Fotos (JPEG) e áudios já são comprimidos: STORE evita trabalho inútil.
-    for (const nc of grupos[i]) {
-      for (const foto of nc.fotos) zip.file(foto.arquivo, foto.blob, { compression: 'STORE' });
-      for (const audio of nc.audios) zip.file(audio.arquivo, audio.blob, { compression: 'STORE' });
-      if (nc.descricaoArquivo) zip.file(nc.descricaoArquivo, nc.descricao);
-      // NC sem nenhum anexo: registra a pasta vazia mesmo assim.
-      if (!nc.fotos.length && !nc.audios.length && !nc.descricaoArquivo) zip.folder(nc.pasta);
-    }
-    const blob = await zip.generateAsync(
-      { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
-      (meta) => { if (aoProgredir) aoProgredir(i + 1, totalPartes, meta.percent); },
-    );
-    const nomeArquivo = totalPartes === 1
-      ? `${nomeBase}.zip`
-      : `${nomeBase}_parte${i + 1}de${totalPartes}.zip`;
-    pacotes.push({ blob, nomeArquivo });
-  }
-
-  return { pacotes, dados };
+  const blob = await montarZip(entradas, {
+    limite32,
+    aoProgredir: (pct) => { if (aoProgredir) aoProgredir('gerando', pct); },
+  });
+  const nomeArquivo = `Inspecao_NR10_${sanitizarNomeArquivo(dados.cliente ? dados.cliente.nome : 'cliente')}_${new Date(dados.inspecao.criadoEm).toISOString().slice(0, 10)}.zip`;
+  return { blob, nomeArquivo, dados };
 }

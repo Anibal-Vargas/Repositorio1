@@ -56,10 +56,11 @@ export function linhaComMenu(cartao, rotuloMenu, aoAbrirMenu) {
 }
 
 /**
- * Menu de ações em folha inferior (aberto pelo "⋮").
- * acoes: [{ rotulo, perigo?, aoTocar }]
+ * Menu de ações em folha inferior (aberto pelo "⋮", e também usado como
+ * aviso com opções). acoes: [{ rotulo, perigo?, principal?, aoTocar }];
+ * mensagem: texto explicativo opcional abaixo do título.
  */
-export function menuAcoes(titulo, acoes) {
+export function menuAcoes(titulo, acoes, mensagem = null) {
   const fechar = () => {
     fundo.remove();
     document.removeEventListener('keydown', aoTeclar);
@@ -68,8 +69,9 @@ export function menuAcoes(titulo, acoes) {
   const aoTeclar = (evento) => { if (evento.key === 'Escape') fechar(); };
   const folha = el('div', { class: 'folha-acoes', role: 'dialog', 'aria-modal': 'true', 'aria-label': titulo },
     el('p', { class: 'folha-titulo' }, titulo),
+    mensagem ? el('p', { class: 'folha-mensagem' }, mensagem) : null,
     acoes.map((acao) => el('button', {
-      class: `btn ${acao.perigo ? 'btn-perigo' : 'btn-secundario'}`,
+      class: `btn ${acao.perigo ? 'btn-perigo' : acao.principal ? 'btn-primario' : 'btn-secundario'}`,
       onclick: () => { fechar(); acao.aoTocar(); },
     }, acao.rotulo)),
     el('button', { class: 'btn btn-discreto', onclick: fechar }, 'Cancelar'),
